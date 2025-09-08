@@ -12,14 +12,30 @@ Learning objectives:
 Prerequisites: exp05_losses_optimizers.py
 """
 
+# PyTorch 2.x Standard Practice Header
 import os, random, numpy as np, torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import TensorDataset, DataLoader
 
 def setup_seed(seed=42):
-    random.seed(seed); np.random.seed(seed); torch.manual_seed(seed)
-    if torch.cuda.is_available(): torch.cuda.manual_seed_all(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    # Add deterministic behavior for reproducibility
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+# Proper device selection (CUDA > MPS > CPU)
+device = torch.device(
+    'cuda' if torch.cuda.is_available() 
+    else 'mps' if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available()
+    else 'cpu'
+)
+amp_enabled = (device.type == 'cuda')
+setup_seed(42)
 
 def make_data(n=4000):
     X = torch.randn(n, 2)

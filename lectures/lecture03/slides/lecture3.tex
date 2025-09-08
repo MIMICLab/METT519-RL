@@ -44,7 +44,7 @@
 \subtitle{Lecture 3: The World of Reinforcement Learning}
 \author{Taehoon Kim}
 \institute{Sogang University MIMIC Lab \\ \url{https://mimic-lab.com}}
-\date{Week 3}
+\date{Fall Semester 2025}
 
 \begin{document}
 
@@ -588,7 +588,7 @@ print(f"Obs space: {env.observation_space}")  # Box(4,)
 \end{frame}
 
 %% Slide 19: Episode Collection Function
-\begin{frame}[fragile]{Episode Collection Function}
+\begin{frame}[fragile,shrink=5]{Episode Collection Function}
 
 \begin{lstlisting}
 def collect_episode(env, policy, max_steps=500):
@@ -1406,37 +1406,6 @@ $\varepsilon$-greedy (0.2) & 350 ± 80 & Medium & 60\% \\
 
 \end{frame}
 
-%% Slide 45: Lab Report Requirements
-\begin{frame}{Lab Report Requirements}
-
-\textbf{Deliverable:} Short lab report explaining your experimental results
-
-\vfill
-
-\textbf{Required Sections:}
-\begin{enumerate}
-    \item \textbf{Experimental Setup:} Environment, policies, parameters
-    \item \textbf{Results:} Return distributions with error bars
-    \item \textbf{Analysis:} Statistical comparison of policies  
-    \item \textbf{TensorBoard Screenshots:} Key visualizations
-    \item \textbf{Discussion:} When/why heuristic fails
-\end{enumerate}
-
-\vfill
-
-\textbf{Key Questions to Address:}
-\begin{itemize}
-    \item How does exploration rate affect performance?
-    \item What conditions cause heuristic policy failures?
-    \item How does discount factor change return calculations?
-    \item What is the relationship between episode length and reward?
-\end{itemize}
-
-\vfill
-
-\textbf{Format:} 2-3 pages PDF, include code snippets and plots
-
-\end{frame}
 
 %% Slide 46: Additional Resources
 \begin{frame}{Additional Resources}
@@ -1471,41 +1440,6 @@ $\varepsilon$-greedy (0.2) & 350 ± 80 & Medium & 60\% \\
     \item Classic control: CartPole, MountainCar, Pendulum
     \item Atari games (for later lectures)
     \item MuJoCo continuous control (advanced)
-\end{itemize}
-
-\end{frame}
-
-%% Slide 47: Office Hours and Support
-\begin{frame}{Office Hours and Support}
-
-\textbf{Getting Help:}
-
-\vfill
-
-\textbf{Office Hours:}
-\begin{itemize}
-    \item Tuesday 2:00-4:00 PM (MIMIC Lab)
-    \item Thursday 10:00-12:00 PM (Online via Zoom)
-    \item Or by appointment via email
-\end{itemize}
-
-\vfill
-
-\textbf{Common Issues:}
-\begin{itemize}
-    \item Environment installation problems
-    \item CUDA/GPU setup for PyTorch
-    \item TensorBoard logging issues
-    \item Statistical analysis questions
-\end{itemize}
-
-\vfill
-
-\textbf{Course Resources:}
-\begin{itemize}
-    \item GitHub repository: \url{https://github.com/mimic-lab/RL2025}
-    \item Course website: \url{https://mimic-lab.com/rl2025}
-    \item Discussion forum: Canvas
 \end{itemize}
 
 \end{frame}
@@ -1627,28 +1561,6 @@ $\varepsilon$-greedy (0.2) & 350 ± 80 & Medium & 60\% \\
 
 \textcolor{blue}{\textbf{We're building the foundation}} for modern deep RL step by step!
 
-\end{frame}
-
-%% Slide 52: Thank You
-\begin{frame}[plain]
-\begin{center}
-\Huge Thank You!
-
-\vfill
-
-\Large Questions \& Discussion
-
-\vfill
-
-\normalsize
-\textbf{Next Lecture:} Mathematical Foundations (MDPs)\\
-\textbf{Homework Due:} Before Lecture 4\\
-\textbf{Contact:} taehoon.kim@sogang.ac.kr
-
-\vfill
-
-\textcolor{blue}{Happy Learning!}
-\end{center}
 \end{frame}
 
 \end{document}

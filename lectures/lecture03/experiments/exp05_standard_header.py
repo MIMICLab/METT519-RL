@@ -57,11 +57,15 @@ class AMPConfig:
 class AMPContext:
     def __init__(self, cfg: AMPConfig, device: torch.device):
         self.cfg, self.device = cfg, device
+        # Only enable AMP for CUDA and CPU (not MPS)
+        amp_enabled = cfg.enabled and device.type in ("cuda", "cpu")
         self.scaler = torch.cuda.amp.GradScaler(enabled=(cfg.enabled and device.type == "cuda"))
+        # Use CPU autocast as fallback for non-CUDA/CPU devices
+        device_type = device.type if device.type in ("cuda", "cpu") else "cpu"
         self._ctx = torch.autocast(
-            device_type=device.type if device.type in ("cuda", "cpu") else "cuda",
+            device_type=device_type,
             dtype=cfg.dtype, 
-            enabled=cfg.enabled
+            enabled=amp_enabled
         )
     
     def __enter__(self):

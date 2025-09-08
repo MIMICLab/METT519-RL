@@ -12,14 +12,30 @@ Learning objectives:
 Prerequisites: exp04_nn_modules.py
 """
 
+# PyTorch 2.x Standard Practice Header
 import os, random, numpy as np, torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import TensorDataset, DataLoader
 
 def setup_seed(seed=42):
-    random.seed(seed); np.random.seed(seed); torch.manual_seed(seed)
-    if torch.cuda.is_available(): torch.cuda.manual_seed_all(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    # Add deterministic behavior for reproducibility
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+# Proper device selection (CUDA > MPS > CPU)
+device = torch.device(
+    'cuda' if torch.cuda.is_available() 
+    else 'mps' if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available()
+    else 'cpu'
+)
+amp_enabled = (device.type == 'cuda')
+setup_seed(42)
 
 def make_data(n=2000):
     X = torch.randn(n, 2)
@@ -64,8 +80,8 @@ def main():
     print("="*50)
     print("Experiment 05: Training Loop, Losses, and Optimizers")
     print("="*50)
-    setup_seed(42)
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Using device: {device}")
+    print(f"AMP enabled: {amp_enabled}")
 
     X, y = make_data(4000)
     n_train = int(0.8*len(X))
@@ -74,7 +90,7 @@ def main():
     train_loader = DataLoader(train_ds, batch_size=64, shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=64)
 
-    model = MLP()
+    model = MLP().to(device)  # CRITICAL: Move model to device
     criterion = nn.CrossEntropyLoss()
 
     for name, optimizer in {
