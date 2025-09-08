@@ -1,0 +1,31 @@
+% mimic.sty - Custom style for RL2025 course materials
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{mimic}[2025/01/07 Custom style for RL course]
+
+% Prevent overfull boxes
+\tolerance=1000
+\emergencystretch=\maxdimen
+\hyphenpenalty=500
+\hbadness=10000
+\vbadness=10000
+
+% Better line breaking in URLs
+\usepackage{url}
+\def\UrlBreaks{\do\/\do-}
+
+% Better handling of long lines in listings
+\usepackage{listings}
+\lstset{
+    breaklines=true,
+    breakatwhitespace=true,
+    basicstyle=\ttfamily\small,
+    columns=flexible,
+    keepspaces=true
+}
+
+% Adjust text width for better line breaking
+\setlength{\textwidth}{0.95\paperwidth}
+\setlength{\textheight}{0.9\paperheight}
+
+\endinput
+

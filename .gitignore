@@ -1,0 +1,75 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+*.egg-info/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb_checkpoints/
+
+# LaTeX Build Files
+*.aux
+*.log
+*.nav
+*.out
+*.snm
+*.toc
+*.vrb
+*.synctex.gz
+*.fdb_latexmk
+*.fls
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Experiment Results (keep code, ignore outputs)
+*/results/
+*/runs/
+*/artifacts/
+*/checkpoints/
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+!docs/images/*
+
+# Models and Data
+*.pth
+*.pt  
+*.ckpt
+*.h5
+*.pkl
+*.json
+data/
+datasets/
+
+# Logs
+*.log
+logs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Environment
+.env
+.envrc
+
+# OS
+Thumbs.db
+.DS_Store

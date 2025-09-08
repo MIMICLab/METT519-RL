@@ -1,0 +1,766 @@
+% Lecture 2: Deep Learning Essentials
+% Target: 70-80 slides for a 3-hour presentation
+\documentclass[aspectratio=169,10pt]{beamer}
+
+% Essential packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{hyperref}
+
+% Use mimic.sty to prevent overfull boxes
+\usepackage{mimic}
+
+% Theme
+\usetheme{Madrid}
+\usecolortheme{seahorse}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+
+% Code listing settings
+\lstset{
+    language=Python,
+    basicstyle=\ttfamily\scriptsize,
+    keywordstyle=\color{blue}\bfseries,
+    stringstyle=\color{red},
+    commentstyle=\color{green!60!black},
+    showstringspaces=false,
+    breaklines=true,
+    breakatwhitespace=true,
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    xleftmargin=1em,
+    framexleftmargin=1em
+}
+
+% Title page information
+\title{Reinforcement Learning}
+\subtitle{Lecture 2: Deep Learning Essentials}
+\author{Taehoon Kim}
+\institute{Sogang University MIMIC Lab \\ \url{https://mimic-lab.com}}
+
+\begin{document}
+
+% Slide 1: Title
+\frame{\titlepage}
+
+% Slide 2: Agenda
+\begin{frame}{Today's Agenda}
+\begin{enumerate}
+    \item Tensors and Automatic Differentiation (Theory, 25 min)
+    \item Neural Network Fundamentals (Theory, 25 min)
+    \item Optimization Techniques (Theory, 25 min)
+    \item Micro-break [5 min]
+    \item Implementation Theory: Training Loops and Modules (25 min)
+    \item Advanced Implementation: Regularization, Init, Schedulers (25 min)
+    \item Micro-break [5 min]
+    \item Hands-on Experiments (E1-E9, 70 min)
+    \item Wrap-up and Next Steps (10 min)
+\end{enumerate}
+\end{frame}
+
+% Slide 3: Learning Objectives and Prerequisites
+\begin{frame}{Learning Objectives and Prerequisites}
+\begin{block}{By the end of this lecture, you will:}
+\begin{itemize}
+    \item Manipulate PyTorch tensors and understand views vs copies
+    \item Use autograd for gradient-based learning and debugging
+    \item Build and train MLP/CNN modules with proper shapes
+    \item Apply optimizers (SGD, Momentum, Adam) and schedulers
+    \item Implement regularization (weight decay, dropout, batchnorm)
+    \item Run 9 experiments culminating in an integrated pipeline test
+\end{itemize}
+\end{block}
+
+\begin{alertblock}{Prerequisites}
+Python 3, NumPy, basic calculus and linear algebra. PyTorch installed from Lecture 1.
+\end{alertblock}
+\end{frame}
+
+% Section: Tensors (Slides 4-12)
+\section{Tensors}
+
+% Slide 4
+\begin{frame}{What is a Tensor?}
+\begin{itemize}
+    \item Generalization of scalars, vectors, matrices to N-d arrays
+    \item PyTorch tensor: typed, device-aware, differentiable
+    \item Shapes and dtypes are first-class design concerns
+\end{itemize}
+\[\text{Example shapes: } (B,C,H,W),\, (N, D),\, (T, B, F)\]
+\end{frame}
+
+% Slide 5
+\begin{frame}[fragile]{Tensor Creation}
+\begin{lstlisting}
+import torch
+x = torch.tensor([[1., 2.], [3., 4.]])
+y = torch.zeros((2, 2), dtype=torch.float32)
+z = torch.randn(3, 4)  # N(0,1)
+like = torch.ones_like(z)
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+z = z.to(device)
+print(x.shape, y.dtype, z.device)
+\end{lstlisting}
+\end{frame}
+
+% Slide 6
+\begin{frame}[fragile]{Shapes, Views, and Copies}
+\begin{lstlisting}
+a = torch.arange(12).reshape(3,4)
+view = a.view(6,2)      # shares storage
+clone = a.clone()       # copy
+perm = a.permute(1,0)   # view with different strides
+contig = perm.contiguous().view(-1)
+\end{lstlisting}
+\textbf{Rule}: Use \texttt{contiguous()} before \texttt{view()} if strides changed.
+\end{frame}
+
+% Slide 7
+\begin{frame}[fragile]{Broadcasting and Reduction}
+\begin{lstlisting}
+x = torch.randn(32, 128)
+bias = torch.randn(128)
+y = x + bias  # broadcast to (32, 128)
+mean = y.mean(dim=0)    # reduce over batch
+sum_ = y.sum(dim=1, keepdim=True)
+\end{lstlisting}
+\end{frame}
+
+% Slide 8
+\begin{frame}[fragile]{Indexing and Masking}
+\begin{lstlisting}
+x = torch.randn(5, 4)
+mask = x[:,0] > 0
+subset = x[mask]
+rows = x[torch.tensor([0,2,4])]
+\end{lstlisting}
+Avoid Python loops over tensors; prefer vectorized ops.
+\end{frame}
+
+% Slide 9
+\begin{frame}[fragile]{Device and Mixed Precision}
+\begin{lstlisting}
+device = torch.device('cuda' if torch.cuda.is_available()
+    else 'mps' if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available()
+    else 'cpu')
+dt = torch.float16 if device.type == 'cuda' else torch.float32
+x = torch.randn(1024, 1024, device=device, dtype=dt)
+\end{lstlisting}
+Choose dtype by device and task; watch for underflow in fp16.
+\end{frame}
+
+% Slide 10
+\begin{frame}{Tensor Best Practices}
+\begin{itemize}
+    \item Annotate shapes in comments and names (e.g., logits[B,C])
+    \item Minimize host-device transfers
+    \item Prefer inplace ops only when safe for autograd
+    \item Use \texttt{torch.compile} and AMP when beneficial
+\end{itemize}
+\end{frame}
+
+% Section: Autograd (Slides 13-22)
+\section{Automatic Differentiation}
+
+% Slide 11
+\begin{frame}{Autograd Overview}
+\begin{itemize}
+    \item Reverse-mode automatic differentiation builds a dynamic graph
+    \item Tensors have \texttt{requires\_grad} flag and \texttt{grad} field
+    \item Backprop computes gradients of scalar loss wrt leaf params
+\end{itemize}
+\end{frame}
+
+% Slide 12
+\begin{frame}[fragile]{Basic Autograd Example}
+\begin{lstlisting}
+x = torch.tensor([2.0], requires_grad=True)
+y = x**3 + 2*x
+y.backward()   # dy/dx at x=2
+print(x.grad)  # 3*x^2 + 2 = 14
+\end{lstlisting}
+\end{frame}
+
+% Slide 13
+\begin{frame}[fragile]{Detach and no\_grad}
+\begin{lstlisting}
+x = torch.randn(4, requires_grad=True)
+y = (x * x).sum()
+y.backward()
+with torch.no_grad():
+    x -= 0.1 * x.grad   # SGD step without tracking
+x = x.detach()          # break graph if reusing tensor
+\end{lstlisting}
+\end{frame}
+
+% Slide 14
+\begin{frame}[fragile]{Custom autograd Function}
+\begin{lstlisting}
+from torch.autograd import Function
+
+class Square(Function):
+    @staticmethod
+    def forward(ctx, input):
+        ctx.save_for_backward(input)
+        return input * input
+    @staticmethod
+    def backward(ctx, grad_output):
+        (input,) = ctx.saved_tensors
+        return 2 * input * grad_output
+
+z = Square.apply(torch.tensor(3.0, requires_grad=True))
+z.backward()
+\end{lstlisting}
+\end{frame}
+
+% Slide 15
+\begin{frame}[fragile]{Gradient Checking (Finite Differences)}
+\begin{lstlisting}
+def numeric_grad(f, x, eps=1e-5):
+    with torch.no_grad():
+        x1 = x.clone(); x1[0] += eps
+        x2 = x.clone(); x2[0] -= eps
+        return (f(x1) - f(x2)) / (2*eps)
+
+x = torch.tensor([1.23], requires_grad=True)
+f = lambda t: (t*t).sum()
+y = f(x)
+y.backward()
+print('auto:', x.grad.item(), 'num:', numeric_grad(f, x.detach()).item())
+\end{lstlisting}
+\end{frame}
+
+% Section: Neural Network Fundamentals (Slides 23-36)
+\section{Neural Network Fundamentals}
+
+% Slide 16
+\begin{frame}[fragile]{nn.Module and Parameters}
+\begin{lstlisting}
+import torch.nn as nn
+
+class MLP(nn.Module):
+    def __init__(self, in_dim=2, hidden=64, out_dim=2):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(in_dim, hidden), nn.ReLU(),
+            nn.Linear(hidden, hidden), nn.ReLU(),
+            nn.Linear(hidden, out_dim)
+        )
+    def forward(self, x):
+        return self.net(x)
+\end{lstlisting}
+\end{frame}
+
+% Slide 17
+\begin{frame}[fragile]{Common Layers}
+\begin{lstlisting}
+conv = nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1)
+bn = nn.BatchNorm1d(64)
+drop = nn.Dropout(p=0.5)
+act = nn.ReLU()
+pool = nn.MaxPool2d(2)
+\end{lstlisting}
+Choose layers based on data modality and inductive bias.
+\end{frame}
+
+% Slide 18
+\begin{frame}[fragile]{Loss Functions}
+\begin{lstlisting}
+ce = nn.CrossEntropyLoss()   # logits[B,C], targets[B]
+mse = nn.MSELoss()           # preds, targets same shape
+\end{lstlisting}
+Cross-entropy for classification, MSE for regression.
+\end{frame}
+
+% Slide 19
+\begin{frame}[fragile]{Forward and Shapes}
+\begin{lstlisting}
+model = MLP(in_dim=2, hidden=32, out_dim=2)
+x = torch.randn(5, 2)
+logits = model(x)   # [5, 2]
+\end{lstlisting}
+Always verify shapes at every step and annotate.
+\end{frame}
+
+% Section: Optimization (Slides 37-48)
+\section{Optimization Techniques}
+
+% Slide 20
+\begin{frame}[fragile]{Optimizers}
+\begin{lstlisting}
+import torch.optim as optim
+
+opt_sgd = optim.SGD(model.parameters(), lr=1e-2)
+opt_mom = optim.SGD(model.parameters(), lr=1e-2, momentum=0.9)
+opt_adam = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
+\end{lstlisting}
+\end{frame}
+
+% Slide 21
+\begin{frame}[fragile]{Training Loop Pattern}
+\begin{lstlisting}
+def train_one_epoch(model, loader, optimizer, criterion, device):
+    model.train()
+    total = 0.0
+    for x, y in loader:
+        x, y = x.to(device), y.to(device)
+        optimizer.zero_grad()
+        logits = model(x)
+        loss = criterion(logits, y)
+        loss.backward()
+        optimizer.step()
+        total += loss.item()*x.size(0)
+    return total/len(loader.dataset)
+\end{lstlisting}
+\end{frame}
+
+% Slide 22
+\begin{frame}[fragile]{Evaluation Pattern}
+\begin{lstlisting}
+def evaluate(model, loader, criterion, device):
+    model.eval()
+    total = 0.0
+    correct = 0
+    with torch.no_grad():
+        for x, y in loader:
+            x, y = x.to(device), y.to(device)
+            logits = model(x)
+            loss = criterion(logits, y)
+            total += loss.item()*x.size(0)
+            pred = logits.argmax(dim=-1)
+            correct += (pred == y).sum().item()
+    return total/len(loader.dataset), correct/len(loader.dataset)
+\end{lstlisting}
+\end{frame}
+
+% Slide 23
+\begin{frame}[fragile]{Learning Rate Schedulers}
+\begin{lstlisting}
+sched = optim.lr_scheduler.StepLR(opt_adam, step_size=10, gamma=0.1)
+for epoch in range(30):
+    loss = train_one_epoch(model, train_loader, opt_adam, ce, device)
+    val_loss, val_acc = evaluate(model, val_loader, ce, device)
+    sched.step()
+\end{lstlisting}
+Schedulers coordinate with optimizer steps per policy.
+\end{frame}
+
+% Slide 24
+\begin{frame}[fragile]{Regularization: Weight Decay and Dropout}
+\begin{lstlisting}
+model = nn.Sequential(
+    nn.Linear(2, 64), nn.ReLU(), nn.Dropout(0.5),
+    nn.Linear(64, 64), nn.ReLU(),
+    nn.Linear(64, 2)
+)
+opt = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
+\end{lstlisting}
+\texttt{weight\_decay} implements L2 penalty; \texttt{Dropout} during \texttt{train()} only.
+\end{frame}
+
+% Slide 25
+\begin{frame}[fragile]{Initialization: Xavier and Kaiming}
+\begin{lstlisting}
+def init_weights(m):
+    if isinstance(m, nn.Linear):
+        nn.init.kaiming_uniform_(m.weight, nonlinearity='relu')
+        nn.init.zeros_(m.bias)
+model.apply(init_weights)
+\end{lstlisting}
+Proper init stabilizes early training.
+\end{frame}
+
+% Slide 26
+\begin{frame}[fragile]{AMP Training}
+\begin{lstlisting}
+from torch.cuda.amp import autocast, GradScaler
+scaler = GradScaler(enabled=torch.cuda.is_available())
+for x, y in loader:
+    optimizer.zero_grad()
+    with autocast(enabled=torch.cuda.is_available()):
+        logits = model(x)
+        loss = ce(logits, y)
+    scaler.scale(loss).backward()
+    scaler.step(optimizer)
+    scaler.update()
+\end{lstlisting}
+\end{frame}
+
+% Slide 27
+\begin{frame}[fragile]{torch.compile for Speed}
+\begin{lstlisting}
+if hasattr(torch, 'compile'):
+    model = torch.compile(model, mode='default')
+\end{lstlisting}
+Potential 1.5-2.0x speedup; profile for benefits.
+\end{frame}
+
+% Section: Implementation Theory (Slides 49-58)
+\section{Implementation Patterns}
+
+% Slide 28
+\begin{frame}{Data Pipeline}
+\begin{itemize}
+    \item Synthetic datasets (blobs, moons) for quick iterations
+    \item Use \texttt{TensorDataset} and \texttt{DataLoader}
+    \item Keep batch size, shuffle, num\_workers explicit
+\end{itemize}
+\end{frame}
+
+% Slide 29
+\begin{frame}[fragile]{DataLoader Example}
+\begin{lstlisting}
+from torch.utils.data import TensorDataset, DataLoader
+X = torch.randn(1000, 2)
+y = (X[:,0] + X[:,1] > 0).long()
+ds = TensorDataset(X, y)
+loader = DataLoader(ds, batch_size=64, shuffle=True)
+\end{lstlisting}
+\end{frame}
+
+% Slide 30
+\begin{frame}{Train/Eval Modes}
+\begin{itemize}
+    \item \texttt{model.train()} enables dropout, batchnorm updates
+    \item \texttt{model.eval()} freezes dropout, uses running stats
+    \item Use \texttt{torch.no\_grad()} for evaluation
+\end{itemize}
+\end{frame}
+
+% Slide 31
+\begin{frame}{Debugging Tips}
+\begin{itemize}
+    \item Check gradients for NaN/inf; clip if needed
+    \item Start with tiny model and dataset
+    \item Overfit a small batch to verify learning
+\end{itemize}
+\end{frame}
+
+% Slide 32
+\begin{frame}{Common Pitfalls}
+\begin{itemize}
+    \item Mismatched shapes or dtypes in loss functions
+    \item Learning rate too high/low
+    \item Forgetting \texttt{.zero\_grad()} or \texttt{model.eval()}
+\end{itemize}
+\end{frame}
+
+% Slide 33
+\begin{frame}{Metrics and Logging}
+\begin{itemize}
+    \item Track loss, accuracy, and learning rate
+    \item Log with TensorBoard or CSV
+    \item Save checkpoints with epoch, optimizer state
+\end{itemize}
+\end{frame}
+
+% Slide 34
+\begin{frame}{When to Use Regularization}
+\begin{itemize}
+    \item Overfitting: gap between train and val accuracy
+    \item Solutions: weight decay, dropout, early stopping
+\end{itemize}
+\end{frame}
+
+% Slide 35
+\begin{frame}{Choosing Optimizers}
+\begin{itemize}
+    \item SGD + momentum for large-scale vision
+    \item Adam for faster convergence on tabular, NLP
+    \item Tune learning rate and decay carefully
+\end{itemize}
+\end{frame}
+
+% Section: Hands-on Mapping (Slides 59-64)
+\section{Hands-on Experiments}
+
+% Slide 36
+\begin{frame}{Experiments Overview}
+E1-E9 map to sections: Tensors, Autograd, Modules, Optimization, Regularization, Pipeline, AMP/compile, Integration Test.
+\end{frame}
+
+% Slide 37
+\begin{frame}{E1: Setup and Sanity}
+Verify device selection, seeds, tensor ops; confirm environment.
+\end{frame}
+
+% Slide 38
+\begin{frame}{E2: Tensors and Views}
+Practice creation, reshape, broadcasting; avoid stride bugs.
+\end{frame}
+
+% Slide 39
+\begin{frame}{E3: Autograd and Graph}
+Compute gradients, use detach/no\_grad, custom Function.
+\end{frame}
+
+% Slide 40
+\begin{frame}{E4: Build an MLP}
+Implement nn.Module, forward pass, shape checks.
+\end{frame}
+
+% Slide 41
+\begin{frame}{E5: Training Loop + Optimizers}
+Train on synthetic data with SGD/Adam and CE/MSE.
+\end{frame}
+
+% Slide 42
+\begin{frame}{E6: Init and Regularization}
+Apply Kaiming/Xavier, weight decay, dropout, batchnorm.
+\end{frame}
+
+% Slide 43
+\begin{frame}{E7: Pipeline + Schedulers}
+Use DataLoader, early stopping, LR schedulers.
+\end{frame}
+
+% Slide 44
+\begin{frame}{E8: AMP and compile}
+Enable AMP and torch.compile; compare speed/accuracy.
+\end{frame}
+
+% Slide 45
+\begin{frame}{E9: Integration Test}
+End-to-end classification on synthetic data with full stack.
+\end{frame}
+
+% Section: Key Takeaways (Slides 65-70)
+\section{Wrap-up}
+
+% Slide 46
+\begin{frame}{Key Takeaways}
+\begin{itemize}
+    \item Solid grasp of tensors and autograd
+    \item End-to-end training patterns with PyTorch 2.x
+    \item Practical optimization and regularization tactics
+\end{itemize}
+\end{frame}
+
+% Slide 47
+\begin{frame}{Common Debug Checklist}
+\begin{itemize}
+    \item Shapes and dtypes consistent
+    \item Learning rate sane; gradients finite
+    \item Train/eval modes set correctly
+\end{itemize}
+\end{frame}
+
+% Slide 48
+\begin{frame}{Next Lecture Preview}
+Transition to RL Fundamentals: agent-environment loop, returns, value functions.
+\end{frame}
+
+% Slide 49
+\begin{frame}{Resources}
+\begin{itemize}
+    \item PyTorch Docs: \url{https://pytorch.org/docs/stable/index.html}
+    \item Dive into Deep Learning: \url{https://d2l.ai}
+    \item Goodfellow et al., Deep Learning (MIT Press)
+\end{itemize}
+\end{frame}
+
+% Section: Worked Examples (Slides 50-60)
+\section{Worked Examples}
+
+% Slide 50
+\begin{frame}{Example: Linear Regression with Autograd}
+Model: $\hat{y}=w^\top x + b$ with MSE loss. Derive gradients and compare to autograd.
+\begin{align*}
+\mathcal{L}(w,b) &= \frac{1}{N}\sum_i (w^\top x_i + b - y_i)^2 \\
+\nabla_w \mathcal{L} &= \frac{2}{N} \sum_i (w^\top x_i + b - y_i) x_i \\
+\partial_b \mathcal{L} &= \frac{2}{N} \sum_i (w^\top x_i + b - y_i)
+\end{align*}
+\end{frame}
+
+% Slide 51
+\begin{frame}[fragile]{Code: Linear Regression}
+\begin{lstlisting}
+w = torch.zeros(2, requires_grad=True); b = torch.zeros(1, requires_grad=True)
+opt = torch.optim.SGD([w, b], lr=1e-1)
+for _ in range(200):
+    y_hat = X @ w + b
+    loss = ((y_hat - y.float())**2).mean()
+    opt.zero_grad(); loss.backward(); opt.step()
+\end{lstlisting}
+\end{frame}
+
+% Slide 52
+\begin{frame}{Example: Softmax Cross-Entropy}
+Softmax: $\sigma(z)_k = \frac{e^{z_k}}{\sum_j e^{z_j}}$, CE: $\ell = -\log \sigma(z)_{y}$.
+\begin{itemize}
+    \item Use logits + \texttt{CrossEntropyLoss} to avoid numerical issues
+    \item Target is class index, not one-hot
+\end{itemize}
+\end{frame}
+
+% Slide 53
+\begin{frame}{Momentum and Adam Intuition}
+\begin{itemize}
+    \item Momentum accumulates velocity $v_t = \beta v_{t-1} + (1-\beta) g_t$
+    \item Adam keeps first and second moments with bias correction
+    \item Sensitive to learning rate and weight decay settings
+\end{itemize}
+\end{frame}
+
+% Slide 54
+\begin{frame}[fragile]{Adam Update (Reference)}
+\begin{lstlisting}
+m = beta1*m + (1-beta1)*g
+v = beta2*v + (1-beta2)*(g*g)
+mhat = m/(1-beta1**t); vhat = v/(1-beta2**t)
+theta = theta - lr * mhat/(vhat.sqrt() + eps)
+\end{lstlisting}
+\end{frame}
+
+% Slide 55
+\begin{frame}{BatchNorm and Dropout Behavior}
+\begin{itemize}
+    \item \texttt{model.train()}: BN updates running stats, Dropout active
+    \item \texttt{model.eval()}: BN uses running stats, Dropout off
+    \item Evaluate with \texttt{no\_grad} to save memory and time
+\end{itemize}
+\end{frame}
+
+% Slide 56
+\begin{frame}{Overfitting a Tiny Batch}
+\begin{itemize}
+    \item Practical test: can your model fit 8 samples to 100\%?
+    \item If not, bug in data, model, or optimizer setup
+\end{itemize}
+\end{frame}
+
+% Slide 57
+\begin{frame}{Gradient Pathologies}
+\begin{itemize}
+    \item Vanishing/exploding gradients: use ReLU, good init, normalization
+    \item Gradient clipping for stability
+\end{itemize}
+\end{frame}
+
+% Slide 58
+\begin{frame}{Shape Annotation Examples}
+\begin{itemize}
+    \item \texttt{x[B,2]} -> \texttt{Linear(2,64)} -> \texttt{h[B,64]}
+    \item \texttt{h[B,64]} -> \texttt{ReLU} -> \texttt{h[B,64]}
+    \item \texttt{h[B,64]} -> \texttt{Linear(64,2)} -> \texttt{logits[B,2]}
+\end{itemize}
+\end{frame}
+
+% Slide 59
+\begin{frame}{Learning Rate Tuning}
+\begin{itemize}
+    \item Try LR range test; monitor loss vs LR
+    \item Too high: divergence; too low: slow learning
+\end{itemize}
+\end{frame}
+
+% Slide 60
+\begin{frame}{Scheduler Choices}
+\begin{itemize}
+    \item StepLR: piecewise constant
+    \item CosineAnnealing: smooth decay
+    \item ReduceLROnPlateau: metric-driven
+\end{itemize}
+\end{frame}
+
+% Section: Visual Aids (Slides 61-68)
+\section{Visual Aids}
+
+% Slide 61
+\begin{frame}{[Diagram Generation Prompt: Autograd Graph for MLP]}
+Nodes for layers and operations; arrows for gradient flow.
+\end{frame}
+
+% Slide 62
+\begin{frame}{[Diagram Generation Prompt: Optimization Trajectories]}
+Contours of loss landscape with SGD, Momentum, Adam paths.
+\end{frame}
+
+% Slide 63
+\begin{frame}{[Diagram Generation Prompt: BatchNorm and Dropout Modes]}
+Train vs eval behavior illustrated on a small network.
+\end{frame}
+
+% Slide 64
+\begin{frame}{[Diagram Generation Prompt: Shape Flow]} 
+Data shape transformations through the network.
+\end{frame}
+
+% Slide 65
+\begin{frame}{[Diagram Generation Prompt: AMP Mixed Precision]} 
+Show fp16/fp32 regions and scaler effects.
+\end{frame}
+
+% Slide 66
+\begin{frame}{[Diagram Generation Prompt: Data Pipeline]} 
+DataLoader, batches, train/eval loops overview.
+\end{frame}
+
+% Section: Resources and Wrap-up (Slides 69-75)
+\section{Resources}
+
+% Slide 67
+\begin{frame}{Practical Tips}
+\begin{itemize}
+    \item Log hyperparameters and seeds
+    \item Save best checkpoints and training curves
+    \item Keep experiments deterministic when possible
+\end{itemize}
+\end{frame}
+
+% Slide 68
+\begin{frame}{Troubleshooting Guide}
+\begin{itemize}
+    \item Loss is NaN: check LR, inputs, BN with small batch
+    \item No learning: verify labels, overfit tiny batch
+\end{itemize}
+\end{frame}
+
+% Slide 69
+\begin{frame}{Glossary}
+Key terms: tensor, autograd, logits, softmax, weight decay, dropout, batchnorm, scheduler.
+\end{frame}
+
+% Slide 70
+\begin{frame}{References}
+\begin{itemize}
+    \item Goodfellow, Bengio, Courville. Deep Learning. MIT Press.
+    \item PyTorch Documentation. \url{https://pytorch.org/docs}
+    \item Smith. Cyclical Learning Rates. arXiv:1506.01186
+\end{itemize}
+\end{frame}
+
+% Slide 71
+\begin{frame}{Next Steps}
+Read ahead on RL fundamentals: MDPs, returns, value functions.
+\end{frame}
+
+% Slide 72
+\begin{frame}{Assignment}
+Complete Lab 2 (100 points) before Lecture 3. Target: reproducible runs.
+\end{frame}
+
+% Slide 73
+\begin{frame}{Q and A}
+Time for questions on tensors, autograd, or training loops.
+\end{frame}
+
+% Slide 74
+\begin{frame}{Thank You}
+Contact: MIMIC Lab | \url{https://mimic-lab.com}
+\end{frame}
+
+% Slide 75
+\begin{frame}{Backup: Numeric Gradient Code}
+See Experiment 03 for finite differences check implementation details.
+\end{frame}
+
+\end{document}
