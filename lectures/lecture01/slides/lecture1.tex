@@ -13,7 +13,8 @@
 \usepackage{algorithm}
 \usepackage{algorithmic}
 \usepackage{hyperref}
-
+\usetikzlibrary{arrows.meta,positioning} % 최신 권장
+\tikzset{>={Stealth[length=2.5mm]}}      % 전역 화살표 팁
 % Use mimic.sty to prevent overfull boxes
 \usepackage{mimic}
 
@@ -45,39 +46,12 @@
 \subtitle{Lecture 1: Course Overview and Environment Setup}
 \author{Taehoon Kim}
 \institute{Sogang University MIMIC Lab \\ \url{https://mimic-lab.com}}
-
+\date{Fall Semester 2025}
 
 \begin{document}
 
 % Slide 1: Title
 \frame{\titlepage}
-
-% Slide 2: Lecture Outline
-\begin{frame}{Today's Agenda}
-\begin{enumerate}
-    \item \textbf{Course Overview} (25 min)
-    \begin{itemize}
-        \item AI-ML-RL hierarchy
-        \item Course structure and expectations
-    \end{itemize}
-    \item \textbf{Mathematical Foundations} (25 min)
-    \begin{itemize}
-        \item MDP formalization
-        \item Notation and terminology
-    \end{itemize}
-    \item \textbf{Environment Setup} (50 min)
-    \begin{itemize}
-        \item Python and PyTorch configuration
-        \item Reproducibility infrastructure
-    \end{itemize}
-    \item \textbf{Hands-on Practice} (70 min)
-    \begin{itemize}
-        \item 9 experiments with live coding
-        \item Integration testing
-    \end{itemize}
-    \item \textbf{Wrap-up} (10 min)
-\end{enumerate}
-\end{frame}
 
 % Slide 3: Learning Objectives
 \begin{frame}{Learning Objectives}
@@ -129,6 +103,7 @@
 \begin{frame}{What is Reinforcement Learning?}
 \begin{columns}
 \column{0.5\textwidth}
+\begin{center}
 \begin{block}{Definition}
 RL learns optimal behavior through \textbf{trial and error} interaction with an environment
 \end{block}
@@ -139,10 +114,10 @@ RL learns optimal behavior through \textbf{trial and error} interaction with an 
     \item Goal: maximize cumulative reward
     \item No explicit supervision
 \end{itemize}
-
+\end{center}
 \column{0.5\textwidth}
 \begin{center}
-\begin{tikzpicture}[scale=0.7]
+\begin{tikzpicture}[scale=1.0]
     \node[draw,circle] (A) at (0,0) {Agent};
     \node[draw,rectangle] (E) at (4,0) {Environment};
     
@@ -214,56 +189,6 @@ Should the agent try new actions (explore) or stick with known good actions (exp
 \end{columns}
 \end{frame}
 
-% Slide 8: Theory-Practice Balance
-\begin{frame}{Theory-Practice Balance}
-\begin{center}
-\Large{\textbf{30\% Theory - 70\% Practice}}
-\end{center}
-
-\begin{columns}
-\column{0.5\textwidth}
-\textbf{Theory (30\%)}
-\begin{itemize}
-    \item Mathematical foundations
-    \item Algorithm derivations
-    \item Convergence proofs
-\end{itemize}
-
-\column{0.5\textwidth}
-\textbf{Practice (70\%)}
-\begin{itemize}
-    \item PyTorch implementations
-    \item Hands-on experiments
-    \item Real-world projects
-\end{itemize}
-\end{columns}
-\end{frame}
-
-% Slide 9: Assessment Structure
-\begin{frame}{Assessment and Evaluation}
-\begin{table}
-\centering
-\begin{tabular}{|l|c|l|}
-\hline
-\textbf{Component} & \textbf{Weight} & \textbf{Description} \\
-\hline
-Weekly Labs & 30\% & 9-10 experiments per week \\
-Mid-Term Exam & 20\% & 10 Short answer questions \\
-Final Exam & 20\% & 1 Essay question \\
-Final Project & 30\% & Open-ended RL application or research paper \\
-\hline
-\end{tabular}
-\end{table}
-
-\begin{block}{Grading Philosophy}
-\begin{itemize}
-    \item Reproducibility is mandatory
-    \item Code quality matters
-    \item Document your experiments
-    \item Collaboration encouraged, copying prohibited
-\end{itemize}
-\end{block}
-\end{frame}
 
 % Slide 10: Required Tools
 \begin{frame}{Required Tools and Resources}
@@ -344,12 +269,9 @@ $$(S_0, A_0, R_1, S_1, A_1, R_2, ..., S_{T-1}, A_{T-1}, R_T, S_T)$$
     \node[draw,circle] (s2) at (6,0) {$S_2$};
     \node[draw,circle] (st) at (9,0) {$S_T$};
     
-    \draw[->,thick] (s0) to node[above] {$A_0$} (s1);
-    \draw[->,thick] (s1) to node[above] {$A_1$} (s2);
+    \draw[->,thick] (s0) to node[above] {$A_0$} node[below,red] {$R_1$} (s1);
+    \draw[->,thick] (s1) to node[above] {$A_1$} node[below,red] {$R_2$} (s2);
     \draw[->,thick,dashed] (s2) to node[above] {...} (st);
-    
-    \draw[->,red] (s1) to[bend right=45] node[below] {$R_1$} (0.5,-1);
-    \draw[->,red] (s2) to[bend right=45] node[below] {$R_2$} (3.5,-1);
 \end{tikzpicture}
 \end{center}
 
@@ -402,15 +324,17 @@ $$J(\pi) = \mathbb{E}_{\pi}\left[\sum_{t=0}^{\infty} \gamma^t R_{t+1}\right]$$
 \begin{frame}{Value Functions}
 \begin{block}{State Value Function}
 Expected return starting from state $s$ following policy $\pi$:
-$$v^{\pi}(s) = \mathbb{E}_{\pi}[G_t | S_t = s]$$
+$$v^{\pi}(s) = \mathbb{E}_{\pi}[G_t \mid S_t = s]$$
 \end{block}
 
 \begin{block}{Action Value Function (Q-function)}
 Expected return starting from state $s$, taking action $a$, then following $\pi$:
-$$q^{\pi}(s,a) = \mathbb{E}_{\pi}[G_t | S_t = s, A_t = a]$$
+$$q^{\pi}(s,a) = \mathbb{E}_{\pi}[G_t \mid S_t = s, A_t = a]$$
 \end{block}
 
-\textbf{Relationship:}
+\textbf{Relationship:} \\
+The policy $\pi(a|s)$ is a probability distribution over actions given state $s$. 
+Therefore, the state value is the expected action value under this distribution:
 $$v^{\pi}(s) = \sum_{a \in \mathcal{A}} \pi(a|s) \cdot q^{\pi}(s,a)$$
 \end{frame}
 
@@ -429,6 +353,99 @@ $$v^*(s) = \max_a \sum_{s'} \mathcal{P}(s'|s,a)[r(s,a) + \gamma v^*(s')]$$
 These equations are the foundation for RL algorithms!
 \end{frame}
 
+% Slide: Bellman Equations (Detailed Explanation)
+\begin{frame}{Bellman Equations: Detailed Explanation}
+
+\begin{block}{Bellman Expectation Equation}
+\begin{itemize}
+    \item Under a given policy $\pi$, the value of a state $s$ is
+    \item the weighted sum of possible actions, where weights are given by $\pi(a|s)$.
+    \item Each action leads probabilistically to a next state $s'$ according to $\mathcal{P}(s'|s,a)$, yielding an immediate reward $r(s,a)$.
+    \item Therefore, $v^\pi(s)$ is the expected immediate reward plus the discounted value of the next state.
+\end{itemize}
+\end{block}
+
+\begin{block}{Bellman Optimality Equation}
+\begin{itemize}
+    \item For the optimal policy, the value of state $s$ is
+    \item the maximum expected return achievable over all possible actions.
+    \item Instead of averaging with $\pi(a|s)$, we take $\max_a$.
+    \item Solving this recursive relation gives the optimal value function $v^*(s)$ and the optimal policy.
+\end{itemize}
+\end{block}
+
+\begin{center}
+\textit{Key idea: The Bellman equations express the value of a state as a recursive relationship between immediate reward and future value.}
+\end{center}
+\end{frame}
+
+% Slide: Bellman — Expectation vs Optimality with one GridWorld
+\begin{frame}{Bellman: Expectation vs Optimality (GridWorld)}
+
+\begin{columns}[T,onlytextwidth]
+%==================== Left: Expectation ====================
+\begin{column}{0.49\textwidth}
+\centering
+\textit{Expectation (policy evaluation)}
+
+\begin{tikzpicture}[scale=0.9, >=Latex, node distance=2.6cm]
+  % Nodes
+  \node[draw,circle,minimum size=8mm] (s1) at (0,0) {$s_1$};
+  \node[draw,circle,minimum size=8mm] (s2) at (2.8,0) {$s_2$};
+  \node[draw,circle,fill=green!25,minimum size=8mm] (s3) at (5.6,0) {$s_3$};
+
+  % Transitions
+  \draw[->,thick] (s1) -- node[above] {Right, r=0} (s2);
+  \draw[->,thick] (s2) -- node[above] {Right, r=+1} (s3);
+  \draw[->,thick] (s2) to[bend left=28] node[below] {Left, r=0} (s1);
+
+  % Policy probabilities at s2
+  \node[draw=none,anchor=north west,font=\small] at (-0.1,-1.1)
+       {$\pi(\,\cdot\,|s_2)$: $\pi(\text{Right}|s_2)=0.7,\ \pi(\text{Left}|s_2)=0.3$};
+  \node[draw=none,anchor=north west,font=\small] at (-0.1,-1.9)
+       {$\gamma=0.9,\quad v^\pi(s_3)=0$ (terminal state)};
+
+  % Value update snippet
+  \node[draw=none,anchor=north west,font=\small,align=left] at (-0.1,-2.9)
+       {$v^\pi(s_2)=0.7\,[1+\gamma v^\pi(s_3)] + 0.3\,[0+\gamma v^\pi(s_1)]$\\
+        $v^\pi(s_1)=0+\gamma v^\pi(s_2)$};
+\end{tikzpicture}
+
+\end{column}
+%==================== Right: Optimality ====================
+\begin{column}{0.49\textwidth}
+\centering
+\textit{Optimality (control)}
+
+\begin{tikzpicture}[scale=0.9, >=Latex, node distance=2.6cm]
+  % Nodes
+  \node[draw,circle,minimum size=8mm] (s1) at (0,0) {$s_1$};
+  \node[draw,circle,minimum size=8mm] (s2) at (2.8,0) {$s_2$};
+  \node[draw,circle,fill=green!25,minimum size=8mm] (s3) at (5.6,0) {$s_3$};
+
+  % Transitions, highlight the greedy edge
+  \draw[->,thick] (s1) -- node[above] {Right, r=0} (s2);
+  \draw[->,ultra thick,blue] (s2) -- node[above] {Right, r=+1} (s3);
+  \draw[->,thick,gray] (s2) to[bend left=28] node[below,gray] {Left, r=0} (s1);
+
+  % Optimal update
+  \node[draw=none,anchor=north west,font=\small] at (-0.1,-1.1)
+       {$\gamma=0.9,\quad v^*(s_3)=0$};
+  \node[draw=none,anchor=north west,font=\small,align=left] at (-0.1,-1.9)
+       {$v^*(s_2)=\max\{\,1+\gamma v^*(s_3),\ \gamma v^*(s_1)\,\}$\\
+        $v^*(s_1)=\gamma v^*(s_2)$};
+  \node[draw=none,anchor=north west,font=\small,align=left] at (-0.1,-3.0)
+       {Greedy policy at $s_2$: choose Right};
+\end{tikzpicture}
+
+\end{column}
+\end{columns}
+
+\medskip
+\centering
+\small Expectation averages action values using $\pi(a|s)$, while Optimality takes the maximum over actions.
+\end{frame}
+
 % Slide 18: Optimal Policy
 \begin{frame}{Optimal Policy and Value Functions}
 \begin{itemize}
@@ -444,6 +461,70 @@ For any policy $\pi$, the greedy policy with respect to $v^{\pi}$ is at least as
 This leads to \textbf{policy iteration} and \textbf{value iteration} algorithms
 \end{frame}
 
+% Slide: Policy Improvement Intuition (with spacing fixed)
+\begin{frame}{Policy Improvement Intuition}
+
+\begin{columns}[T,onlytextwidth]
+%==================== Left: Current Policy ====================
+\begin{column}{0.5\textwidth}
+\centering
+\textit{Current policy $\pi$ (mixed actions)}
+
+\begin{tikzpicture}[scale=0.9, >=Stealth, node distance=3.5cm]
+  % State
+  \node[draw,circle,minimum size=9mm] (s) at (0,0) {$s$};
+
+  % Actions
+  \node[draw,rectangle,minimum size=10mm,fill=blue!20] (a1) at (3,1.8) {$a_1$};
+  \node[draw,rectangle,minimum size=10mm,fill=red!20]  (a2) at (3,-1.8) {$a_2$};
+
+  % Edges
+  \draw[->] (s) -- (a1) node[midway,above left] {$\pi(a_1|s)=0.7$};
+  \draw[->] (s) -- (a2) node[midway,below left] {$\pi(a_2|s)=0.3$};
+
+  % Q-values
+  \node[draw=none,anchor=west,font=\small] at (4.2,1.8) {$q^\pi(s,a_1)=5$};
+  \node[draw=none,anchor=west,font=\small] at (4.2,-1.8) {$q^\pi(s,a_2)=1$};
+\end{tikzpicture}
+
+\vspace{3pt}
+
+\[
+v^\pi(s) = 0.7 \times 5 + 0.3 \times 1 = 3.8
+\]
+\end{column}
+
+%==================== Right: Greedy Policy ====================
+\begin{column}{0.5\textwidth}
+\centering
+\textit{Greedy policy $\pi'$ (choose best action)}
+
+\begin{tikzpicture}[scale=0.9, >=Stealth, node distance=3.5cm]
+  % State
+  \node[draw,circle,minimum size=9mm] (s) at (0,0) {$s$};
+
+  % Best action
+  \node[draw,rectangle,minimum size=10mm,fill=blue!35] (a1) at (3,0) {$a_1$};
+
+  % Edge
+  \draw[->,ultra thick,blue] (s) -- (a1) node[midway,above] {$\pi'(a_1|s)=1.0$};
+
+  % Q-value
+  \node[draw=none,anchor=west,font=\small] at (4.2,0) {$q^\pi(s,a_1)=5$};
+\end{tikzpicture}
+
+\vspace{6pt}
+
+\[
+v^{\pi'}(s) = \max_a q^\pi(s,a) = 5
+\]
+\end{column}
+\end{columns}
+
+\vspace{10pt}
+\centering
+ Greedy policy always achieves at least as high value as the original policy.
+\end{frame}
 % Slide 19: RL Problem Types
 \begin{frame}{Types of RL Problems}
 \begin{table}
@@ -1120,30 +1201,6 @@ All code must work on both CPU and GPU!
     \item Review linear algebra
     \item Complete all 9 experiments
     \item Read Chapter 2 materials
-\end{itemize}
-\end{frame}
-
-% Slide 74: Resources
-\begin{frame}{Resources and Support}
-\textbf{Course Materials:}
-\begin{itemize}
-    \item Lecture slides and scripts
-    \item Experiment code (exp01-exp09)
-    \item Standard header module
-\end{itemize}
-
-\textbf{External Resources:}
-\begin{itemize}
-    \item PyTorch documentation
-    \item Sutton \& Barto textbook
-    \item OpenAI Spinning Up
-    \item DeepMind lectures
-\end{itemize}
-
-\textbf{Getting Help:}
-\begin{itemize}
-    \item Office hours: Tue/Thu 1-6pm
-    \item Short Q\&A via Email
 \end{itemize}
 \end{frame}
 
