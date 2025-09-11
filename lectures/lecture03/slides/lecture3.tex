@@ -8,6 +8,7 @@
 \usepackage{listings}
 \usepackage{xcolor}
 \usepackage{tikz}
+\usetikzlibrary{arrows.meta,calc}
 \usepackage{algorithm}
 \usepackage{algorithmic}
 \usepackage{hyperref}
@@ -51,24 +52,6 @@
 %% Slide 1: Title Page
 \begin{frame}[plain]
     \titlepage
-\end{frame}
-
-%% Slide 2: Today's Agenda
-\begin{frame}{Today's Agenda - 3 Hours}
-\begin{itemize}
-    \item \textbf{Segment 1}: Course Introduction \& RL Overview [0:00-0:25] - 25 min
-    \item \textbf{Segment 2}: Agent-Environment Interface [0:25-0:50] - 25 min
-    \item \textbf{Segment 3}: Episodes, Returns \& Discounting [0:50-1:15] - 25 min
-    \item \textbf{MICRO-BREAK 1} [1:15-1:20] - 5 min
-    \item \textbf{Segment 4}: Exploration vs Exploitation [1:20-1:45] - 25 min
-    \item \textbf{Segment 5}: Policy Implementation Theory [1:45-2:10] - 25 min
-    \item \textbf{MICRO-BREAK 2} [2:10-2:15] - 5 min
-    \item \textbf{Segment 6}: Hands-on CartPole Experiments [2:15-3:25] - 70 min
-    \item \textbf{Segment 7}: Wrap-up \& Next Steps [3:25-3:35] - 10 min
-\end{itemize}
-
-\vfill
-\textcolor{blue}{\textbf{Theory/Practice Split:}} 30\% Theory (54 min) | 70\% Practice (126 min)
 \end{frame}
 
 %% Slide 3: Learning Objectives
@@ -306,7 +289,7 @@ where $\gamma \in [0,1]$ is the \textbf{discount factor}
 
 \textbf{$\gamma = 1$ (Farsighted):}
 \begin{itemize}
-    \item All future rewards equal
+    \item All future rewards matter
     \item $G_t = \sum r_{t+k+1}$
     \item May not converge
 \end{itemize}
@@ -433,36 +416,86 @@ $$\pi_{\varepsilon}(a|s) = \begin{cases}
 %% Slide 14: CartPole Environment Details
 \begin{frame}{CartPole Environment Details}
 
-\begin{center}
-[Diagram Generation Prompt: CartPole environment showing cart on track with pole, indicating forces, angles, and coordinates with labels for state variables]
-\end{center}
+\begin{columns}[T]  % 위쪽 정렬
+  % ---------- 왼쪽: 텍스트 ----------
+  \begin{column}{0.4\textwidth}
 
-\vfill
+  \textbf{State Variables:}
+  \begin{itemize}
+      \item $x$: cart position on track
+      \item $\dot{x}$: cart velocity
+      \item $\theta$: pole angle from vertical
+      \item $\dot{\theta}$: angular velocity of pole
+  \end{itemize}
 
-\textbf{State Variables:}
-\begin{itemize}
-    \item $x$: cart position on track
-    \item $\dot{x}$: cart velocity  
-    \item $\theta$: pole angle from vertical
-    \item $\dot{\theta}$: angular velocity of pole
-\end{itemize}
+  \vfill
 
-\vfill
+  \textbf{Actions:}
+  \begin{itemize}
+      \item 0: Push cart left
+      \item 1: Push cart right
+  \end{itemize}
 
-\textbf{Actions:}
-\begin{itemize}
-    \item 0: Push cart left
-    \item 1: Push cart right
-\end{itemize}
+  \vfill
 
-\vfill
+  \textbf{Termination Conditions:}
+  \begin{itemize}
+      \item Pole angle $> 12^\circ$ from vertical
+      \item Cart position $> 2.4$ units from center
+      \item Episode length $> 500$ steps (truncation)
+  \end{itemize}
 
-\textbf{Termination Conditions:}
-\begin{itemize}
-    \item Pole angle $> 12^\circ$ from vertical
-    \item Cart position $> 2.4$ units from center
-    \item Episode length $> 500$ steps (truncation)
-\end{itemize}
+  \end{column}
+
+\begin{column}{0.6\textwidth}
+\begin{tikzpicture}[
+    x=1cm, y=1cm, scale=0.6, transform shape, >=Latex,
+    force/.style={-{Latex[length=3mm]}, very thick, blue, line cap=round},
+    ref/.style={dash pattern=on 3pt off 3pt, line width=0.9pt, gray!60},
+    note/.style={font=\small}
+]
+
+% 컬럼 밖 넘침 방지
+\path[use as bounding box] (-6.1,-2.3) rectangle (6.1,6.2);
+
+% 트랙
+\draw[line width=1.3pt] (-6,0) -- (6,0);
+
+% 카트와 축
+\def\cartW{2.6}
+\def\cartH{1.4}
+\coordinate (C) at (0,0.75);
+\draw[fill=black] (-\cartW/2,0) rectangle (\cartW/2,\cartH);
+\fill[gray!70] (C) circle (2pt);
+
+% 수직 기준선들
+\draw[ref] (-0.9,0.2) -- (-0.9,5.6);
+\draw[gray!55,line width=0.6pt] (0,0.2) -- (0,5.8);  % 중앙 얇은 실선
+\draw[ref] (0.9,0.2) -- (0.9,5.6);
+
+% 폴: 수직에서 우측으로 ang만큼 기울임
+\def\ang{24}     % 수직 대비 양의 각도(오른쪽)
+\def\L{4.0}      % 폴 길이
+\draw[line width=5pt, brown!80!black, line cap=round]
+      (C) -- ($(C)+(90-\ang:\L)$);
+
+% θ: 수직선과 폴 사이의 각. 시계방향 호를 'delta angle'로 확정
+\draw[-{Latex[length=2mm]}, line width=0.9pt]
+      (C) ++(0,1.55) [shift={(C)}]
+      arc[start angle=90, delta angle=-\ang, radius=1.55];
+\node[note] at ($(C)+(0.55,3.45)$) {$\theta$};
+
+
+% 액션 화살표와 라벨(텍스트는 위로, 화살표는 트랙 바로 위)
+\draw[force] (-3.6,0.33) -- (-1.35,0.33);
+\draw[force] ( 3.6,0.33) -- ( 1.35,0.33);
+\node[note, blue] at (-3.05,0.95) {action 1 (push right)};
+\node[note, blue] at ( 3.05,0.95) {action 0 (push left)};
+
+
+\end{tikzpicture}
+\end{column}
+\end{columns}
 
 \end{frame}
 
@@ -714,20 +747,6 @@ def log_experiment_results(policy_results, logdir="runs/lecture3"):
 
 \end{frame}
 
-%% Slide 23: MICRO-BREAK 1
-\begin{frame}[plain]
-\begin{center}
-\Huge \textcolor{blue}{MICRO-BREAK 1}
-
-\vfill
-
-\Large 5 minutes
-
-\vfill
-
-\textcolor{gray}{Stretch, hydrate, prepare for hands-on experiments}
-\end{center}
-\end{frame}
 
 %% Slide 24: Experiment Overview
 \begin{frame}{Experiment Overview - Next 70 Minutes}
@@ -942,21 +961,6 @@ python exp06_cartpole_heuristics.py
 
 \textbf{Engineering Insight:} Good heuristics often outperform naive RL initially
 
-\end{frame}
-
-%% Slide 31: MICRO-BREAK 2
-\begin{frame}[plain]
-\begin{center}
-\Huge \textcolor{blue}{MICRO-BREAK 2}
-
-\vfill
-
-\Large 5 minutes
-
-\vfill
-
-\textcolor{gray}{Quick break before final experiments}
-\end{center}
 \end{frame}
 
 %% Slide 32: Experiment 07 - TensorBoard Logging
@@ -1342,6 +1346,30 @@ $\varepsilon$-greedy (0.2) & 350 ± 80 & Medium & 60\% \\
 \end{itemize}
 
 \end{frame}
+%% Slide 50: Key Takeaways
+\begin{frame}{Key Takeaways}
+
+\begin{enumerate}
+    \item \textbf{RL is about sequential decision making} under uncertainty with delayed rewards
+
+    \item \textbf{The agent-environment interface} is the fundamental abstraction for all RL problems
+
+    \item \textbf{Exploration vs exploitation} is a central challenge requiring principled solutions
+
+    \item \textbf{Heuristic policies} can be surprisingly effective but don't generalize or learn
+
+    \item \textbf{Reproducibility} is essential for scientific RL research and debugging
+
+    \item \textbf{Statistical analysis} is crucial for reliable policy comparisons
+
+    \item \textbf{Good experimental practices} (logging, visualization, validation) matter immensely
+\end{enumerate}
+
+\vfill
+
+\textcolor{blue}{\textbf{Most Important:}} Today's foundation enables everything we'll build in future lectures!
+
+\end{frame}
 
 %% Slide 43: Limitations of Current Approach
 \begin{frame}{Limitations of Current Approach}
@@ -1444,6 +1472,38 @@ $\varepsilon$-greedy (0.2) & 350 ± 80 & Medium & 60\% \\
 
 \end{frame}
 
+
+
+
+
+%% Slide 51: Course Progress Update
+\begin{frame}{Course Progress Update}
+
+\textbf{Completed So Far:}
+\begin{itemize}
+    \item[$\checkmark$] \textbf{Lecture 1:} AI-ML-RL hierarchy, environment setup
+    \item[$\checkmark$] \textbf{Lecture 2:} PyTorch fundamentals, neural networks  
+    \item[$\checkmark$] \textbf{Lecture 3:} RL fundamentals, agent-environment interaction
+\end{itemize}
+
+\vfill
+
+\textbf{Coming Next (13-week roadmap):}
+\begin{itemize}
+    \item \textbf{Lecture 4:} Mathematical foundations (MDPs, Bellman equations)
+    \item \textbf{Lecture 5:} Q-learning and tabular methods
+    \item \textbf{Lecture 6:} Deep Q-Networks (DQN)
+    \item \textbf{Lecture 7:} DQN project and implementation
+    \item \textbf{Lectures 8-11:} Policy gradients, Actor-Critic, PPO, advanced topics
+    \item \textbf{Lectures 12-13:} Final projects and presentations
+\end{itemize}
+
+\vfill
+
+\textcolor{blue}{\textbf{We're building the foundation}} for modern deep RL step by step!
+
+\end{frame}
+
 %% Slide 48: Preview of Lecture 4
 \begin{frame}{Preview of Lecture 4: Mathematical Foundations}
 
@@ -1474,92 +1534,6 @@ $\varepsilon$-greedy (0.2) & 350 ± 80 & Medium & 60\% \\
 \vfill
 
 \textbf{Bridge to Today:} Transform intuitive policies into principled value-based learning
-
-\end{frame}
-
-%% Slide 49: Final Checklist
-\begin{frame}{Final Checklist - Before You Leave}
-
-\textbf{Verify You Can:}
-
-\checkmark \textbf{Run all experiments successfully} (exp01 through exp09)
-
-\checkmark \textbf{Explain agent-environment interaction cycle}
-
-\checkmark \textbf{Calculate discounted returns by hand}
-
-\checkmark \textbf{Implement epsilon-greedy policies}
-
-\checkmark \textbf{Use TensorBoard for experiment logging}
-
-\checkmark \textbf{Reproduce experimental results with seeding}
-
-\vfill
-
-\textbf{If Any Item Fails:}
-\begin{itemize}
-    \item Review corresponding experiment
-    \item Check installation and dependencies
-    \item Ask questions in office hours
-    \item Complete before attempting homework
-\end{itemize}
-
-\vfill
-
-\textcolor{green}{\textbf{Success Criteria:}} Ready to proceed to mathematical foundations!
-
-\end{frame}
-
-%% Slide 50: Key Takeaways
-\begin{frame}{Key Takeaways}
-
-\begin{enumerate}
-    \item \textbf{RL is about sequential decision making} under uncertainty with delayed rewards
-
-    \item \textbf{The agent-environment interface} is the fundamental abstraction for all RL problems
-
-    \item \textbf{Exploration vs exploitation} is a central challenge requiring principled solutions
-
-    \item \textbf{Heuristic policies} can be surprisingly effective but don't generalize or learn
-
-    \item \textbf{Reproducibility} is essential for scientific RL research and debugging
-
-    \item \textbf{Statistical analysis} is crucial for reliable policy comparisons
-
-    \item \textbf{Good experimental practices} (logging, visualization, validation) matter immensely
-\end{enumerate}
-
-\vfill
-
-\textcolor{blue}{\textbf{Most Important:}} Today's foundation enables everything we'll build in future lectures!
-
-\end{frame}
-
-%% Slide 51: Course Progress Update
-\begin{frame}{Course Progress Update}
-
-\textbf{Completed So Far:}
-\begin{itemize}
-    \item[$\checkmark$] \textbf{Lecture 1:} AI-ML-RL hierarchy, environment setup
-    \item[$\checkmark$] \textbf{Lecture 2:} PyTorch fundamentals, neural networks  
-    \item[$\checkmark$] \textbf{Lecture 3:} RL fundamentals, agent-environment interaction
-\end{itemize}
-
-\vfill
-
-\textbf{Coming Next (13-week roadmap):}
-\begin{itemize}
-    \item \textbf{Lecture 4:} Mathematical foundations (MDPs, Bellman equations)
-    \item \textbf{Lecture 5:} Q-learning and tabular methods
-    \item \textbf{Lecture 6:} Deep Q-Networks (DQN)
-    \item \textbf{Lecture 7:} DQN project and implementation
-    \item \textbf{Lectures 8-11:} Policy gradients, Actor-Critic, PPO, advanced topics
-    \item \textbf{Lectures 12-13:} Final projects and presentations
-\end{itemize}
-
-\vfill
-
-\textcolor{blue}{\textbf{We're building the foundation}} for modern deep RL step by step!
 
 \end{frame}
 
