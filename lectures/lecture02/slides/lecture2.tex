@@ -54,33 +54,6 @@
 % Slide 1: Title page
 \frame{\titlepage}
 
-% Slide 2: Today's Agenda with timing breakdown
-\begin{frame}{Today's Agenda}
-\begin{enumerate}
-    \item \textbf{Tensors and PyTorch Fundamentals} (25 min)
-    \begin{itemize}
-        \item Tensor creation and operations
-        \item Device management (CPU/CUDA/MPS)
-    \end{itemize}
-    \item \textbf{Automatic Differentiation} (25 min)
-    \begin{itemize}
-        \item Computational graphs
-        \item Backpropagation mechanics
-    \end{itemize}
-    \item \textbf{Neural Network Modules} (50 min)
-    \begin{itemize}
-        \item nn.Module and layers
-        \item Loss functions and optimizers
-    \end{itemize}
-    \item \textbf{Hands-on Practice} (70 min)
-    \begin{itemize}
-        \item 9 experiments with live coding
-        \item Integration testing
-    \end{itemize}
-    \item \textbf{Wrap-up} (10 min)
-\end{enumerate}
-\end{frame}
-
 % Slide 3: Learning Objectives
 \begin{frame}{Learning Objectives}
 \begin{block}{By the end of this lecture, you will:}
@@ -544,22 +517,53 @@ gathered_q = q_values.gather(1, actions.long())
 \end{enumerate}
 \end{frame}
 
-% Slide 23: Computational Graphs
+% Slide 23: Computational Graphs (two-column layout)
 \begin{frame}{Computational Graphs}
-\textbf{Dynamic Computational Graph:}
-\begin{itemize}
-    \item Built during forward pass
-    \item Nodes: tensors (data)
-    \item Edges: operations (functions)
-    \item Each operation stores gradient function
-\end{itemize}
+\begin{columns}[T,onlytextwidth]
 
-\textbf{Example:} $y = (x_1 + x_2) \cdot x_3$
-\begin{center}
-[Diagram: Show graph with x1, x2, x3 nodes, addition node, multiplication node, and y output]
-\end{center}
+  % 왼쪽 컬럼: 설명
+  \begin{column}{0.58\textwidth}
+  Dynamic computational graph:
+  \begin{itemize}
+      \item Built during forward pass
+      \item Nodes: tensors (data)
+      \item Edges: operations (functions)
+      \item Each operation stores gradient function
+  \end{itemize}
 
-\textbf{Key Point:} Graph is created on-the-fly and can change between iterations
+  Example: $y = (x_1 + x_2)\cdot x_3$
+
+  \medskip
+  Key point: graph is created on the fly and can change between iterations.
+  \end{column}
+
+  % 오른쪽 컬럼: 다이어그램
+  \begin{column}{0.42\textwidth}
+  \centering
+  \begin{tikzpicture}[
+      scale=0.9, transform shape, >=latex,
+      var/.style={draw,circle,minimum size=12pt,inner sep=2pt},
+      op/.style={draw,rectangle,minimum width=12pt,minimum height=12pt,inner sep=2pt}
+  ]
+      % 좌표 배치
+      \node[var] (x1) at (0,0) {$x_1$};
+      \node[var] (x2) at (2,0) {$x_2$};
+      \node[op]  (add) at (1,-1.0) {+};
+
+      \node[var] (x3) at (2,-1.5) {$x_3$};
+      \node[op]  (mul) at (1,-2.5) {$\times$};
+      \node[var] (y)   at (1,-4.0) {$y$};
+
+      % 연결
+      \draw[->] (x1) -- (add);
+      \draw[->] (x2) -- (add);
+      \draw[->] (add) -- (mul);
+      \draw[->] (x3) -- (mul);
+      \draw[->] (mul) -- (y);
+  \end{tikzpicture}
+  \end{column}
+
+\end{columns}
 \end{frame}
 
 % Slide 24: requires_grad and Leaf Tensors
@@ -1509,30 +1513,6 @@ Always verify tensor shapes, device placement, and gradient flow!
     \item Complete all 9 experiments from today
     \item Install Gymnasium: \texttt{pip install gymnasium}
     \item Review Markov Decision Processes
-\end{itemize}
-\end{frame}
-
-% Slide 74: Resources
-\begin{frame}{Resources and Support}
-\textbf{Course Materials:}
-\begin{itemize}
-    \item Lecture slides and scripts
-    \item Experiment code (exp01-exp09)
-    \item Lab exercises with solutions
-\end{itemize}
-
-\textbf{External Resources:}
-\begin{itemize}
-    \item PyTorch Documentation: pytorch.org/docs
-    \item PyTorch Tutorials: pytorch.org/tutorials
-    \item Deep Learning Book: deeplearningbook.org
-    \item Papers With Code: paperswithcode.com
-\end{itemize}
-
-\textbf{Getting Help:}
-\begin{itemize}
-    \item Office hours: Tue/Thu 1-6pm
-    \item Short Q\&A via Email
 \end{itemize}
 \end{frame}
 
