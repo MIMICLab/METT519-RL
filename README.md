@@ -30,7 +30,7 @@ This repository hosts the lecture slides and hands-on experiments for the Fall 2
 │   ├── lecture04/  # MDPs and dynamic programming
 │   ├── lecture05/  # Tabular Q-learning
 │   ├── lecture06/  # Deep Q-Networks
-│   └── AGENTS.md   # Contribution and publishing checklist
+│   └── ...
 ├── requirements.txt
 └── README.md
 ```
