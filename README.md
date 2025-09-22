@@ -48,8 +48,6 @@ pip install -r requirements.txt
 
 ## Working Notes
 - GPU acceleration is optional; CPU-only execution is supported throughout Lecture 6 with smaller batch sizes.
-- Labs and graded assignments are not yet published for this term.
-- Follow the naming and testing conventions in `lectures/AGENTS.md` when updating materials.
 
 ## License
 Released under the MIT License. See `LICENSE` for details.
