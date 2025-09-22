@@ -17,6 +17,11 @@ def setup_seed(seed=42):
     random.seed(seed); np.random.seed(seed); torch.manual_seed(seed)
     if torch.cuda.is_available(): torch.cuda.manual_seed_all(seed)
 
+
+def _data_ptr(tensor: torch.Tensor) -> int:
+    """Return a device-agnostic pointer for the tensor's storage."""
+    return tensor.untyped_storage().data_ptr()
+
 device = torch.device('cuda' if torch.cuda.is_available() else (
     'mps' if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available() else 'cpu'))
 setup_seed(42)
@@ -33,8 +38,8 @@ def main():
     clone = a.clone()
     perm = a.permute(1,0)
     contig = perm.contiguous().view(-1)
-    assert view.storage().data_ptr() == a.storage().data_ptr()
-    assert clone.storage().data_ptr() != a.storage().data_ptr()
+    assert _data_ptr(view) == _data_ptr(a)
+    assert _data_ptr(clone) != _data_ptr(a)
 
     # Broadcasting
     x = torch.randn(32, 128)
@@ -53,4 +58,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

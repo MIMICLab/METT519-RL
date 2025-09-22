@@ -375,12 +375,16 @@ def visualize_policy_comparison(results: Dict[str, PolicyAnalysis], save_path: s
     axes[1, 2].grid(True, alpha=0.3)
     
     plt.tight_layout()
-    
+
     if save_path:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         print(f"Policy comparison plot saved to: {save_path}")
-    else:
+    elif plt.isinteractive():
         plt.show()
+    else:
+        print("Warning: Matplotlib running in non-interactive mode; skipping figure display.")
+
+    plt.close(fig)
 
 def hyperparameter_tuning_demo():
     """Demonstrate hyperparameter tuning for PD controller"""

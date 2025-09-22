@@ -1481,47 +1481,4 @@ python exp09_integrated_test.py
 \end{enumerate}
 \end{frame}
 
-% Slide 72: Common Pitfalls
-\begin{frame}{Common Pitfalls to Avoid}
-\begin{itemize}
-    \item $\times$ Forgetting to zero gradients before backward
-    \item $\times$ Not moving model and data to same device
-    \item $\times$ Using in-place operations that break autograd
-    \item $\times$ Not using torch.no\_grad() during evaluation
-    \item $\times$ Incorrect broadcasting assumptions
-    \item $\times$ Memory leaks from retained gradients
-\end{itemize}
-
-\begin{block}{Remember}
-Always verify tensor shapes, device placement, and gradient flow!
-\end{block}
-\end{frame}
-
-% Slide 73: Next Week Preview
-\begin{frame}{Next Week: RL Fundamentals}
-\textbf{Topics:}
-\begin{itemize}
-    \item Agent-environment interaction
-    \item States, actions, and rewards
-    \item Episode structure and returns
-    \item Gymnasium API introduction
-    \item Basic RL algorithms
-\end{itemize}
-
-\textbf{Preparation:}
-\begin{itemize}
-    \item Complete all 9 experiments from today
-    \item Install Gymnasium: \texttt{pip install gymnasium}
-    \item Review Markov Decision Processes
-\end{itemize}
-\end{frame}
-
-% Slide 75: Final Slide
-\begin{frame}{Master the Fundamentals}
-\begin{center}
-\Large{Strong foundations enable advanced techniques.}
-\vfill
-\textbf{See you next week for RL Fundamentals!}
-\end{center}
-\end{frame}
 \end{document}

@@ -8,6 +8,7 @@ Demonstrates checkpoint saving/loading for models, optimizers, and training stat
 """
 
 import os
+import random
 import torch
 import torch.nn as nn
 import numpy as np
@@ -66,7 +67,7 @@ class Checkpointer:
         
         # Add RNG states for reproducibility
         checkpoint['rng_states'] = {
-            'python': np.random.get_state(),
+            'python': random.getstate(),
             'numpy': np.random.get_state(),
             'torch': torch.get_rng_state(),
         }
@@ -123,7 +124,7 @@ class Checkpointer:
             rng_states = checkpoint['rng_states']
             
             if 'python' in rng_states:
-                np.random.set_state(rng_states['python'])
+                random.setstate(rng_states['python'])
             if 'numpy' in rng_states:
                 np.random.set_state(rng_states['numpy'])
             if 'torch' in rng_states:
@@ -214,6 +215,8 @@ def demo_checkpoint_workflow():
     
     # Load latest checkpoint
     latest_ckpt = checkpointer.get_latest()
+    checkpoint_state = None
+    pre_resume_match = None
     if latest_ckpt:
         print(f"\n  Loading checkpoint: {latest_ckpt.name}")
         
@@ -227,6 +230,12 @@ def demo_checkpoint_workflow():
         # Restore training state
         start_step = checkpoint['step']
         train_loss = checkpoint.get('train_loss', [])
+        checkpoint_state = {k: v.clone() for k, v in checkpoint.get('model', {}).items()}
+        if checkpoint_state:
+            pre_resume_match = all(
+                torch.allclose(model_new.state_dict()[name].detach().cpu(), tensor.cpu())
+                for name, tensor in checkpoint_state.items()
+            )
         
         print(f"  Resuming from step {start_step}")
     else:
@@ -256,13 +265,16 @@ def demo_checkpoint_workflow():
     # Verify model equivalence
     print("\n  Verifying checkpoint restoration:")
     
-    # Compare parameters
-    params_match = all(
-        torch.allclose(p1, p2)
-        for p1, p2 in zip(model.parameters(), model_new.parameters())
-    )
-    
-    print(f"    Parameters match: {'✓' if params_match else '✗'}")
+    if checkpoint_state is not None:
+        print(f"    Matches checkpoint parameters pre-resume: {'✓' if pre_resume_match else '✗'}")
+
+        post_training_match = all(
+            torch.allclose(model_new.state_dict()[name].detach().cpu(), tensor.cpu())
+            for name, tensor in checkpoint_state.items()
+        )
+        print(f"    Parameters changed after resume: {'✓' if not post_training_match else '✗'}")
+    else:
+        print("    No checkpoint available to verify.")
     print(f"    Total training steps: {len(train_loss)}")
     
     return True

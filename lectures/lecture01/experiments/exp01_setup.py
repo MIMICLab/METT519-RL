@@ -9,6 +9,7 @@ and ensures all required dependencies are available for the course.
 """
 
 import sys
+import os
 import platform
 import subprocess
 from pathlib import Path
@@ -150,7 +151,7 @@ def save_system_info():
         "platform": platform.platform(),
         "architecture": platform.machine(),
         "processor": platform.processor(),
-        "cpu_count": platform.cpu_count()
+        "cpu_count": os.cpu_count()
     }
     
     # Try to get pip list

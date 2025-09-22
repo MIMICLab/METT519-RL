@@ -26,6 +26,12 @@ def make_data(n=5000):
     y = (X[:,0] + X[:,1] > 0).long()
     return X, y
 
+device = torch.device(
+    'cuda' if torch.cuda.is_available()
+    else 'mps' if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available()
+    else 'cpu'
+)
+
 class MLP(nn.Module):
     def __init__(self):
         super().__init__()
@@ -41,6 +47,8 @@ class MLP(nn.Module):
 def evaluate(model, loader, criterion):
     model.eval(); total = 0.0; correct = 0
     for x, y in loader:
+        x = x.to(device)
+        y = y.to(device)
         logits = model(x)
         loss = criterion(logits, y)
         total += loss.item()*x.size(0)
@@ -50,6 +58,8 @@ def evaluate(model, loader, criterion):
 def train_one_epoch(model, loader, optimizer, criterion):
     model.train(); total = 0.0
     for x, y in loader:
+        x = x.to(device)
+        y = y.to(device)
         optimizer.zero_grad(); logits = model(x); loss = criterion(logits, y)
         loss.backward(); optimizer.step(); total += loss.item()*x.size(0)
     return total/len(loader.dataset)
@@ -66,7 +76,7 @@ def main():
     train_loader = DataLoader(train_ds, batch_size=128, shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=256)
 
-    model = MLP()
+    model = MLP().to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.5)
@@ -89,4 +99,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

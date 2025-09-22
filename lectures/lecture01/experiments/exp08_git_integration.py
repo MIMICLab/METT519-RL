@@ -327,7 +327,7 @@ def demo_automated_commit():
         dummy_file = Path("runs") / "dummy_experiment.txt"
         dummy_file.parent.mkdir(parents=True, exist_ok=True)
         dummy_file.write_text(f"Experiment run at {datetime.now()}")
-        run_command(f"git add {dummy_file}")
+        print(f"  Created {dummy_file} (not staged). Use `git add` manually if desired.")
     
     # Generate commit message
     config_hash = hashlib.md5(str(datetime.now()).encode()).hexdigest()[:8]

@@ -12,7 +12,7 @@ Learning objectives:
 Prerequisites: exp07_training_pipeline.py
 """
 
-import os, time, random, numpy as np, torch
+import os, time, random, numpy as np, torch, platform
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import TensorDataset, DataLoader
@@ -40,9 +40,12 @@ class MLP(nn.Module):
 
 def train_steps(model, loader, optimizer, criterion, steps=50, use_amp=False):
     model.train(); scaler = GradScaler(enabled=use_amp)
+    device = next(model.parameters()).device
     t0 = time.time()
     it = 0
     for x, y in loader:
+        x = x.to(device)
+        y = y.to(device)
         optimizer.zero_grad()
         with autocast(enabled=use_amp):
             logits = model(x)
@@ -52,6 +55,18 @@ def train_steps(model, loader, optimizer, criterion, steps=50, use_amp=False):
         if it >= steps: break
     return time.time() - t0
 
+def can_use_torch_compile() -> bool:
+    """Return True when torch.compile is available and its backend is usable."""
+    if not hasattr(torch, "compile"):
+        return False
+    if platform.system().lower().startswith("win"):
+        try:
+            import triton  # type: ignore
+        except ImportError:
+            return False
+    return True
+
+
 def main():
     print("="*50)
     print("Experiment 08: AMP and torch.compile")
@@ -59,7 +74,7 @@ def main():
     setup_seed(42)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     X, y = make_data(10000)
-    ds = TensorDataset(X.to(device), y.to(device))
+    ds = TensorDataset(X, y)
     loader = DataLoader(ds, batch_size=512, shuffle=True)
     criterion = nn.CrossEntropyLoss()
 
@@ -75,8 +90,10 @@ def main():
 
     # compile
     model_comp = MLP().to(device)
-    if hasattr(torch, 'compile'):
+    if can_use_torch_compile():
         model_comp = torch.compile(model_comp, mode='default')
+    elif hasattr(torch, 'compile'):
+        print("torch.compile not supported on this platform (Triton backend missing)")
     optimizer_comp = optim.Adam(model_comp.parameters(), lr=1e-3)
     t_comp = train_steps(model_comp, loader, optimizer_comp, criterion, use_amp=False)
 
@@ -87,4 +104,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

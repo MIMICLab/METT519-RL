@@ -641,7 +641,16 @@ class IntegratedTester:
     
     def compare_policies(self, data_a: List[float], data_b: List[float]) -> Dict[str, float]:
         """Simple policy comparison"""
-        from scipy import stats as scipy_stats
+        try:
+            from scipy import stats as scipy_stats
+        except ImportError:
+            print('Warning: SciPy not installed; skipping statistical tests.')
+            return {
+                "cohens_d": None,
+                "t_statistic": None,
+                "p_value": None,
+                "error": "scipy-not-installed"
+            }
         
         # Calculate Cohen's d (effect size)
         mean_a, mean_b = np.mean(data_a), np.mean(data_b)

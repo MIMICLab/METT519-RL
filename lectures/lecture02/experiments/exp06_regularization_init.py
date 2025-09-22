@@ -62,6 +62,8 @@ def init_kaiming(m):
 def evaluate(model, loader, criterion):
     model.eval(); total = 0.0; correct = 0
     for x, y in loader:
+        x = x.to(device)
+        y = y.to(device)
         logits = model(x)
         loss = criterion(logits, y)
         total += loss.item()*x.size(0)
@@ -71,6 +73,8 @@ def evaluate(model, loader, criterion):
 def train_epoch(model, loader, opt, crit):
     model.train(); total = 0.0
     for x, y in loader:
+        x = x.to(device)
+        y = y.to(device)
         opt.zero_grad(); logits = model(x); loss = crit(logits, y)
         loss.backward(); opt.step(); total += loss.item()*x.size(0)
     return total/len(loader.dataset)
@@ -86,7 +90,7 @@ def main():
     val_loader = DataLoader(ds, batch_size=256)
     crit = nn.CrossEntropyLoss()
 
-    model = RegNet(p=0.5)
+    model = RegNet(p=0.5).to(device)
     model.apply(init_kaiming)
     opt = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
     for epoch in range(8):
@@ -98,4 +102,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

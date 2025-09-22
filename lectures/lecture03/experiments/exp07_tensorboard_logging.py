@@ -35,7 +35,6 @@ setup_seed(42)
 
 import gymnasium as gym
 import matplotlib.pyplot as plt
-from torch.utils.tensorboard import SummaryWriter
 from typing import Dict, List, Any, Callable, Tuple
 import json
 import time
@@ -43,6 +42,44 @@ import datetime
 from dataclasses import dataclass, asdict
 import io
 import base64
+
+try:
+    from torch.utils.tensorboard import SummaryWriter as _SummaryWriterImpl
+    _TENSORBOARD_AVAILABLE = True
+except ImportError:
+    _TENSORBOARD_AVAILABLE = False
+
+    class _StubSummaryWriter:
+        """Fallback writer that disables TensorBoard logging gracefully."""
+
+        _warned = False
+
+        def __init__(self, *args, **kwargs):
+            if not _StubSummaryWriter._warned:
+                print("Warning: TensorBoard not installed; logging calls will be no-ops.")
+                _StubSummaryWriter._warned = True
+
+        def add_scalar(self, *args, **kwargs):
+            pass
+
+        def add_histogram(self, *args, **kwargs):
+            pass
+
+        def add_text(self, *args, **kwargs):
+            pass
+
+        def add_image(self, *args, **kwargs):
+            pass
+
+        def add_hparams(self, *args, **kwargs):
+            pass
+
+        def close(self):
+            pass
+
+    _SummaryWriterImpl = _StubSummaryWriter
+
+SummaryWriter = _SummaryWriterImpl
 
 @dataclass
 class ExperimentConfig:

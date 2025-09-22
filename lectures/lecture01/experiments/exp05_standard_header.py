@@ -18,6 +18,7 @@ import torch.nn.functional as F
 from pathlib import Path
 from datetime import datetime
 import json
+import platform
 
 # ============================================================================
 # STANDARD CODE HEADER V1 - Core Module
@@ -44,6 +45,11 @@ def setup_seed(seed=42, deterministic=True):
         torch.backends.cudnn.benchmark = False
         torch.backends.cudnn.deterministic = True
     else:
+        try:
+            torch.use_deterministic_algorithms(False)
+        except Exception:
+            pass
+        os.environ.pop('CUBLAS_WORKSPACE_CONFIG', None)
         if torch.cuda.is_available():
             torch.backends.cudnn.benchmark = True
             torch.backends.cudnn.deterministic = False
@@ -93,15 +99,29 @@ def get_scaler(enabled=True):
                 pass
         return DummyScaler()
 
+def _torch_compile_supported() -> bool:
+    if not hasattr(torch, "compile"):
+        return False
+    if platform.system().lower().startswith("win"):
+        try:
+            import triton  # type: ignore
+        except ImportError:
+            return False
+    return True
+
+
 def compile_if_available(module, mode='default'):
     """Optionally compile module with torch.compile (PyTorch 2.x)"""
-    if hasattr(torch, 'compile'):
-        try:
-            return torch.compile(module, mode=mode)
-        except Exception as e:
-            print(f"Warning: torch.compile failed: {e}")
-            return module
-    return module
+    if not _torch_compile_supported():
+        if hasattr(torch, 'compile'):
+            print("Warning: torch.compile not supported on this platform (missing Triton backend)")
+        return module
+
+    try:
+        return torch.compile(module, mode=mode)
+    except Exception as e:
+        print(f"Warning: torch.compile failed: {e}")
+        return module
 
 # ============================================================================
 # Training Utilities

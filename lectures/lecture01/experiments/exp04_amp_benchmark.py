@@ -18,6 +18,7 @@ from pathlib import Path
 import json
 from datetime import datetime
 from contextlib import contextmanager
+import platform
 
 # Setup device
 def get_device():
@@ -29,21 +30,39 @@ def get_device():
     else:
         return torch.device('cpu')
 
+# torch.compile support detection -------------------------------------------------
+
+def can_use_torch_compile() -> bool:
+    """Return True when torch.compile is available and its backend is usable."""
+    if not hasattr(torch, "compile"):
+        return False
+
+    if platform.system().lower().startswith("win"):
+        try:
+            import triton  # type: ignore
+        except ImportError:
+            return False
+
+    return True
+
 # Timer context manager
 @contextmanager
-def timer(name="Operation"):
-    """Simple timer context manager"""
+def timer(name="Operation", record=None):
+    """Simple timer context manager that can record elapsed milliseconds."""
     if torch.cuda.is_available():
         torch.cuda.synchronize()
-    
+
     start = time.perf_counter()
     yield
-    
+
     if torch.cuda.is_available():
         torch.cuda.synchronize()
-    
+
     elapsed = time.perf_counter() - start
-    print(f"  {name}: {elapsed*1000:.2f} ms")
+    elapsed_ms = elapsed * 1000
+    if record is not None:
+        record(elapsed_ms)
+    print(f"  {name}: {elapsed_ms:.2f} ms")
 
 class BenchmarkModel(nn.Module):
     """Model for benchmarking - simulates a typical deep network"""
@@ -185,10 +204,13 @@ def benchmark_compiled_training(model, device, batch_size=128, num_steps=50):
     print("\n  Compiled Training (FP32, torch.compile):")
     
     # Check if torch.compile is available (PyTorch 2.0+)
-    if not hasattr(torch, 'compile'):
-        print("    torch.compile not available (requires PyTorch 2.0+)")
+    if not can_use_torch_compile():
+        if hasattr(torch, 'compile'):
+            print("    torch.compile not supported on this platform (Triton backend missing)")
+        else:
+            print("    torch.compile not available (requires PyTorch 2.0+)")
         return None, None
-    
+
     model = model.to(device)
     
     # Compile the model
@@ -254,12 +276,15 @@ def benchmark_amp_compiled_training(model, device, batch_size=128, num_steps=50)
         print("    AMP not available on this device")
         return None, None
     
-    if not hasattr(torch, 'compile'):
-        print("    torch.compile not available")
+    if not can_use_torch_compile():
+        if hasattr(torch, 'compile'):
+            print("    torch.compile not supported on this platform (Triton backend missing)")
+        else:
+            print("    torch.compile not available")
         return None, None
-    
+
     from torch.cuda.amp import autocast, GradScaler
-    
+
     model = model.to(device)
     
     # Compile the model
@@ -331,21 +356,22 @@ def benchmark_matmul_operations(device):
     
     for size in sizes:
         print(f"\n  Matrix size: {size[0]}x{size[1]}")
-        results[f"{size[0]}x{size[1]}"] = {}
+        size_key = f"{size[0]}x{size[1]}"
+        results[size_key] = {}
         
         # Create matrices
         A = torch.randn(size, device=device)
         B = torch.randn(size, device=device)
         
         # Standard matmul
-        with timer("Standard (FP32)"):
+        with timer("Standard (FP32)", lambda ms, key=size_key: results[key].__setitem__('fp32_ms', ms)):
             for _ in range(10):
                 C = torch.matmul(A, B)
         
         # With TF32 (if available)
         if device.type == 'cuda' and torch.cuda.is_available():
             torch.set_float32_matmul_precision('high')
-            with timer("TF32 precision"):
+            with timer("TF32 precision", lambda ms, key=size_key: results[key].__setitem__('tf32_ms', ms)):
                 for _ in range(10):
                     C = torch.matmul(A, B)
             torch.set_float32_matmul_precision('highest')
@@ -353,11 +379,11 @@ def benchmark_matmul_operations(device):
         # With AMP (if available)
         if device.type == 'cuda':
             from torch.cuda.amp import autocast
-            with timer("AMP (FP16)"):
+            with timer("AMP (FP16)", lambda ms, key=size_key: results[key].__setitem__('amp_ms', ms)):
                 with autocast():
                     for _ in range(10):
                         C = torch.matmul(A, B)
-    
+
     return results
 
 def save_benchmark_results(results):
@@ -390,7 +416,7 @@ def main():
         print(f"GPU: {torch.cuda.get_device_name(0)}")
     
     # Matrix multiplication benchmarks
-    benchmark_matmul_operations(device)
+    matmul_results = benchmark_matmul_operations(device)
     
     # Model training benchmarks
     print("\n" + "="*60)
@@ -400,7 +426,8 @@ def main():
     results = {
         "device": str(device),
         "pytorch_version": torch.__version__,
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
+        "matmul": matmul_results
     }
     
     # Benchmark different configurations

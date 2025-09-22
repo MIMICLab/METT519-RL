@@ -22,6 +22,7 @@ import numpy as np
 import torch
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
+import platform
 
 try:
     import gymnasium as gym
@@ -62,9 +63,12 @@ class AMPContext:
         self.scaler = torch.cuda.amp.GradScaler(enabled=(cfg.enabled and device.type == "cuda"))
         # Use CPU autocast as fallback for non-CUDA/CPU devices
         device_type = device.type if device.type in ("cuda", "cpu") else "cpu"
+        autocast_dtype = cfg.dtype
+        if device_type == "cpu" and autocast_dtype == torch.float16:
+            autocast_dtype = torch.bfloat16
         self._ctx = torch.autocast(
             device_type=device_type,
-            dtype=cfg.dtype, 
+            dtype=autocast_dtype,
             enabled=amp_enabled
         )
     
@@ -181,8 +185,24 @@ def dqn_step(batch: Dict[str, torch.Tensor],
     }
 
 # ----------------------------- torch.compile ---------------------------------
+def _torch_compile_supported() -> bool:
+    if not hasattr(torch, "compile"):
+        return False
+    if platform.system().lower().startswith("win"):
+        try:
+            import triton  # type: ignore
+        except ImportError:
+            return False
+    return True
+
+
 def maybe_compile(module: nn.Module) -> nn.Module:
     """Try to compile module, fall back gracefully if not supported"""
+    if not _torch_compile_supported():
+        if hasattr(torch, 'compile'):
+            print("Warning: torch.compile not supported on this platform (missing Triton backend)")
+        return module
+
     try:
         return torch.compile(module)  # PyTorch 2.x
     except Exception:
