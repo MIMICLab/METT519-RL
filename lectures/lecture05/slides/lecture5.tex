@@ -120,6 +120,10 @@ $$Q^\pi(s,a) = \mathbb{E}_\pi\left[\sum_{t=0}^{\infty}\gamma^t r_{t+1} \bigg| s_
 
 \textbf{Optimal action-value function:}
 $$Q^*(s,a) = \max_\pi Q^\pi(s,a)$$
+\vspace{0.6em}
+\begin{block}{Connection to last lecture}
+Last time we introduced the Bellman equation for the state value $v(s)$. Q-learning extends the same idea to the action-value $Q(s,a)$ so that we learn not just ``how good a state is'' but also ``how good each action is in that state.''
+\end{block}
 \end{frame}
 
 % Section: Theoretical Foundations
@@ -138,7 +142,8 @@ $$Q^*(s,a) = R(s,a) + \gamma \sum_{s'} P(s'|s,a) \max_{a'} Q^*(s',a')$$
     \item $\max_{a'} Q^*(s',a')$: Best future value
     \item $\gamma$: Discount factor
 \end{itemize}
-
+\vspace{0.4em}
+\textit{Intuition:} the term $\max_{a'} Q^*(s',a')$ means that when we evaluate taking action $a$ at $s$, we assume that from the next state $s'$ onward we will act optimally. Thus, current value equals immediate reward plus the best possible future value.
 \textbf{Optimal Policy:}
 $$\pi^*(s) = \arg\max_a Q^*(s,a)$$
 \end{frame}
@@ -157,6 +162,9 @@ $$(T^*Q)(s,a) = R(s,a) + \gamma \sum_{s'} P(s'|s,a) \max_{a'} Q(s',a')$$
     \item \textbf{Uniqueness:} $Q^*$ is the unique fixed point
     \item \textbf{Convergence:} $\lim_{n \to \infty} (T^*)^n Q = Q^*$
 \end{enumerate}
+\vspace{0.4em}
+\textit{Why contraction implies convergence:} applying $T^*$ repeatedly pulls any two Q-functions closer by at least a factor $\gamma<1$, so iterations must collapse to the unique fixed point $Q^*$.
+
 \end{frame}
 
 % Slide 8: Q-Learning Target Construction
@@ -239,7 +247,8 @@ $$Q(s_t, a_t) \leftarrow Q(s_t, a_t) + \alpha \cdot \text{TD error}$$
 where
 $$\text{TD error} = \underbrace{r_{t+1} + \gamma \max_{a'} Q(s_{t+1}, a')}_{\text{TD target}} - Q(s_t, a_t)$$
 \end{block}
-
+\vspace{0.4em}
+\textit{From Bellman to samples:} this update is a sample-based approximation to the Bellman optimality backup—replace the expectation over $s'$ by a single observed transition and bootstrap with $\max_{a'}Q(s_{t+1},a')$.
 \textbf{Components:}
 \begin{itemize}
     \item $\alpha \in (0,1]$: Learning rate (step size)
@@ -297,6 +306,8 @@ $$\pi_\varepsilon(a|s) = \begin{cases}
 \begin{block}{Exploration Schedule}
 Common choice: $\varepsilon_t = \max(\varepsilon_{min}, \varepsilon_0 \cdot \text{decay}^t)$
 \end{block}
+\vspace{0.4em}
+\textit{Why $\varepsilon$-greedy is a strong default:} it is simple, cheap to compute, and as $\varepsilon\to 0$ the behavior policy becomes greedy, enabling convergence under the usual conditions.
 \end{frame}
 
 % Section: Convergence Theory
@@ -362,6 +373,7 @@ n_states = env.observation_space.n
 n_actions = env.action_space.n
 Q = torch.zeros((n_states, n_actions), 
                 dtype=torch.float32, device=device)
+                
 \end{lstlisting}
 \end{frame}
 
@@ -575,6 +587,8 @@ $$Q(s,a) \leftarrow Q(s,a) + \alpha[r + \gamma Q(s',a') - Q(s,a)]$$
 
 \vspace{1em}
 \textbf{Key Difference:} Q-learning uses $\max_{a'} Q(s',a')$, SARSA uses $Q(s',a')$ where $a'$ is sampled
+\vspace{0.4em}
+\textit{Practical takeaway:} SARSA tends to be more stable but can learn more cautiously because it accounts for exploratory moves during training; Q-learning aims for the greedy limit and can learn faster yet behave risk-seeking.
 \end{frame}
 
 % Slide 22: Cliff Walking Example
@@ -760,6 +774,9 @@ $$G_t^{(n)} = R_{t+1} + \gamma R_{t+2} + ... + \gamma^{n-1} R_{t+n} + \gamma^n \
     \item Smaller n: More bias, less variance
     \item Optimal n problem-dependent
 \end{itemize}
+\vspace{0.4em}
+\textit{Intuition:} n-step targets interpolate between 1-step TD (high bias, low variance) and Monte Carlo (low bias, high variance) by looking ahead a few steps before bootstrapping.
+
 \end{frame}
 
 % Section: Practical Considerations
@@ -981,6 +998,10 @@ Double Q & 75\% & 2000 & 21.3 \\
         \item Each has specific use cases
     \end{itemize}
 \end{enumerate}
+\vspace{0.6em}
+\begin{block}{Link back to Lecture 4}
+Value iteration needs the model and backs up expected values exactly. Q-learning does not need the model and learns the same fixed point from data by approximating those backups with samples.
+\end{block}
 \end{frame}
 
 

@@ -16,10 +16,15 @@ Prerequisites: exp03_policy_evaluation.py completed
 
 import os
 import random
+from pathlib import Path
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from typing import Dict, List, Tuple, Optional
+
+DEFAULT_FIGURES_DIR = Path(__file__).resolve().parent / "figures"
+FIGURES_DIR = Path(os.environ.get("LECTURE04_FIGURES_DIR", DEFAULT_FIGURES_DIR))
+FIGURES_DIR.mkdir(parents=True, exist_ok=True)
 
 from exp02_gridworld import GridWorldMDP, GridWorldSpec, create_classic_gridworld, setup_seed, get_device, ACTION_NAMES
 from exp03_policy_evaluation import policy_evaluation
@@ -244,9 +249,9 @@ def visualize_policy_improvement(mdp, V_old, V_new, Q):
     axes[1, 2].grid(True, alpha=0.3)
     
     plt.tight_layout()
-    os.makedirs('./figures', exist_ok=True)
-    plt.savefig('./figures/policy_improvement.png', dpi=150, bbox_inches='tight')
-    print("✓ Visualization saved to ./figures/policy_improvement.png")
+    out_path = FIGURES_DIR / 'policy_improvement.png'
+    plt.savefig(out_path, dpi=150, bbox_inches='tight')
+    print(f"✓ Visualization saved to {out_path}")
     plt.close()
 
 def test_soft_improvement():

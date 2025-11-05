@@ -23,9 +23,14 @@ import matplotlib.pyplot as plt
 from typing import Dict, List, Tuple, Optional, Set
 import time
 import heapq
+from pathlib import Path
 
 from exp02_gridworld import GridWorldMDP, GridWorldSpec, setup_seed, get_device
 from exp04_policy_improvement import compute_q_values
+
+DEFAULT_FIGURES_DIR = Path(__file__).resolve().parent / "figures"
+FIGURES_DIR = Path(os.environ.get("LECTURE04_FIGURES_DIR", DEFAULT_FIGURES_DIR))
+FIGURES_DIR.mkdir(parents=True, exist_ok=True)
 
 def synchronous_value_iteration(
     P: torch.Tensor,
@@ -390,9 +395,9 @@ def compare_algorithms():
     ax.set_title(f'Performance Summary ({grid_key} grid)', y=0.8)
     
     plt.tight_layout()
-    os.makedirs('./figures', exist_ok=True)
-    plt.savefig('./figures/algorithm_optimizations.png', dpi=150, bbox_inches='tight')
-    print("\n✓ Algorithm comparison saved to ./figures/algorithm_optimizations.png")
+    out_path = FIGURES_DIR / 'algorithm_optimizations.png'
+    plt.savefig(out_path, dpi=150, bbox_inches='tight')
+    print(f"\n✓ Algorithm comparison saved to {out_path}")
     plt.close()
 
 def test_memory_efficiency():

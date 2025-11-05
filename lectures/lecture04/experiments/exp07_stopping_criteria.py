@@ -27,7 +27,9 @@ from exp02_gridworld import GridWorldMDP, GridWorldSpec, create_classic_gridworl
 from exp04_policy_improvement import compute_q_values
 from exp06_value_iteration import value_iteration
 
-FIGURES_DIR = Path(__file__).parent / "figures"
+DEFAULT_FIGURES_DIR = Path(__file__).resolve().parent / "figures"
+FIGURES_DIR = Path(os.environ.get("LECTURE04_FIGURES_DIR", DEFAULT_FIGURES_DIR))
+FIGURES_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def value_iteration_with_bounds(

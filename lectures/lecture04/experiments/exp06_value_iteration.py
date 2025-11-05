@@ -16,6 +16,7 @@ Prerequisites: exp05_policy_iteration.py completed
 
 import os
 import random
+from pathlib import Path
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
@@ -24,6 +25,11 @@ import time
 
 from exp02_gridworld import GridWorldMDP, GridWorldSpec, create_classic_gridworld, setup_seed, get_device, ACTION_NAMES
 from exp04_policy_improvement import compute_q_values
+
+DEFAULT_FIGURES_DIR = Path(__file__).resolve().parent / "figures"
+FIGURES_DIR = Path(os.environ.get("LECTURE04_FIGURES_DIR", DEFAULT_FIGURES_DIR))
+FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+
 from exp05_policy_iteration import policy_iteration
 
 def value_iteration(
@@ -224,9 +230,9 @@ def compare_vi_pi():
     plt.grid(True, alpha=0.3)
     
     plt.tight_layout()
-    os.makedirs('./figures', exist_ok=True)
-    plt.savefig('./figures/vi_pi_comparison.png', dpi=150, bbox_inches='tight')
-    print("\n✓ Comparison saved to ./figures/vi_pi_comparison.png")
+    comparison_path = FIGURES_DIR / 'vi_pi_comparison.png'
+    plt.savefig(comparison_path, dpi=150, bbox_inches='tight')
+    print(f"\n✓ Comparison saved to {comparison_path}")
     plt.close()
     
     return vi_result, pi_result
@@ -334,8 +340,9 @@ def test_different_initializations():
             plt.legend()
     
     plt.tight_layout()
-    plt.savefig('./figures/vi_initializations.png', dpi=150, bbox_inches='tight')
-    print("\n✓ Initialization comparison saved to ./figures/vi_initializations.png")
+    init_path = FIGURES_DIR / 'vi_initializations.png'
+    plt.savefig(init_path, dpi=150, bbox_inches='tight')
+    print(f"\n✓ Initialization comparison saved to {init_path}")
     plt.close()
     
     # Verify all converge to same solution

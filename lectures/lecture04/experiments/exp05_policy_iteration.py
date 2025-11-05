@@ -16,6 +16,7 @@ Prerequisites: exp04_policy_improvement.py completed
 
 import os
 import random
+from pathlib import Path
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
@@ -25,6 +26,10 @@ import time
 from exp02_gridworld import GridWorldMDP, GridWorldSpec, create_classic_gridworld, setup_seed, get_device, ACTION_NAMES
 from exp03_policy_evaluation import policy_evaluation
 from exp04_policy_improvement import policy_improvement, compute_q_values
+
+DEFAULT_FIGURES_DIR = Path(__file__).resolve().parent / "figures"
+FIGURES_DIR = Path(os.environ.get("LECTURE04_FIGURES_DIR", DEFAULT_FIGURES_DIR))
+FIGURES_DIR.mkdir(parents=True, exist_ok=True)
 
 def policy_iteration(
     P: torch.Tensor,           # [S, A, S]
@@ -224,9 +229,9 @@ def visualize_policy_evolution(mdp: GridWorldMDP, history: Dict):
         axes[i].axis('off')
     
     plt.tight_layout()
-    os.makedirs('./figures', exist_ok=True)
-    plt.savefig('./figures/policy_evolution.png', dpi=150, bbox_inches='tight')
-    print("✓ Policy evolution saved to ./figures/policy_evolution.png")
+    out_path = FIGURES_DIR / 'policy_evolution.png'
+    plt.savefig(out_path, dpi=150, bbox_inches='tight')
+    print(f"✓ Policy evolution saved to {out_path}")
     plt.close()
 
 def compare_initial_policies():
@@ -314,8 +319,9 @@ def compare_initial_policies():
     plt.grid(True, alpha=0.3)
     
     plt.tight_layout()
-    plt.savefig('./figures/policy_iteration_comparison.png', dpi=150, bbox_inches='tight')
-    print("\n✓ Comparison saved to ./figures/policy_iteration_comparison.png")
+    comparison_path = FIGURES_DIR / 'policy_iteration_comparison.png'
+    plt.savefig(comparison_path, dpi=150, bbox_inches='tight')
+    print(f"\n✓ Comparison saved to {comparison_path}")
     plt.close()
     
     return results

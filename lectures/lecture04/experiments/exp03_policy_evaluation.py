@@ -16,11 +16,16 @@ Prerequisites: exp02_gridworld.py completed
 
 import os
 import random
+from pathlib import Path
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
+
+DEFAULT_FIGURES_DIR = Path(__file__).resolve().parent / "figures"
+FIGURES_DIR = Path(os.environ.get("LECTURE04_FIGURES_DIR", DEFAULT_FIGURES_DIR))
+FIGURES_DIR.mkdir(parents=True, exist_ok=True)
 
 # Import GridWorld from previous experiment
 from exp02_gridworld import GridWorldMDP, GridWorldSpec, create_classic_gridworld, setup_seed, get_device
@@ -301,9 +306,9 @@ def analyze_convergence_rates():
     plt.legend()
     plt.grid(True, alpha=0.3)
     
-    os.makedirs('./figures', exist_ok=True)
-    plt.savefig('./figures/policy_eval_convergence.png', dpi=150, bbox_inches='tight')
-    print(f"\n✓ Convergence plot saved to ./figures/policy_eval_convergence.png")
+    fig_path = FIGURES_DIR / 'policy_eval_convergence.png'
+    plt.savefig(fig_path, dpi=150, bbox_inches='tight')
+    print(f"\n✓ Convergence plot saved to {fig_path}")
     plt.close()
 
 def main():

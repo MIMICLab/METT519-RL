@@ -17,6 +17,8 @@ Prerequisites: All previous experiments (exp01-exp08) completed
 import os
 import sys
 import random
+from pathlib import Path
+
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
@@ -33,6 +35,10 @@ from exp04_policy_improvement import policy_improvement, compute_q_values
 from exp05_policy_iteration import policy_iteration
 from exp06_value_iteration import value_iteration
 from exp07_stopping_criteria import value_iteration_with_bounds
+
+DEFAULT_FIGURES_DIR = Path(__file__).resolve().parent / "figures"
+FIGURES_DIR = Path(os.environ.get("LECTURE04_FIGURES_DIR", DEFAULT_FIGURES_DIR))
+FIGURES_DIR.mkdir(parents=True, exist_ok=True)
 
 @dataclass
 class ExperimentConfig:
@@ -312,9 +318,9 @@ def visualize_complete_solution(mdp: GridWorldMDP, result: Dict, scenario_name: 
     ax9.set_title('MDP Configuration')
     
     plt.tight_layout()
-    os.makedirs('./figures', exist_ok=True)
-    plt.savefig(f'./figures/integrated_{scenario_name}.png', dpi=150, bbox_inches='tight')
-    print(f"✓ Saved to ./figures/integrated_{scenario_name}.png")
+    out_path = FIGURES_DIR / f'integrated_{scenario_name}.png'
+    plt.savefig(out_path, dpi=150, bbox_inches='tight')
+    print(f"✓ Saved to {out_path}")
     plt.close()
 
 def simulate_trajectories(mdp: GridWorldMDP, policy: torch.Tensor, 
