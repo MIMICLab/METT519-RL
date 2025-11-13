@@ -1,0 +1,1101 @@
+\documentclass[aspectratio=169,10pt]{beamer}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{hyperref}
+\usepackage{mimic}
+
+\usetheme{Madrid}
+\usecolortheme{seahorse}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+
+% Code listing settings
+\lstset{
+    language=Python,
+    basicstyle=\ttfamily\scriptsize,
+    keywordstyle=\color{blue}\bfseries,
+    stringstyle=\color{red},
+    commentstyle=\color{green!60!black},
+    showstringspaces=false,
+    breaklines=true,
+    breakatwhitespace=true,
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    xleftmargin=1em,
+    framexleftmargin=1em
+}
+
+% Title page information
+\title{Reinforcement Learning}
+\subtitle{Lecture 8: Policy Gradient Methods - REINFORCE}
+\author{Taehoon Kim}
+\institute{Sogang University MIMIC Lab \\ \url{https://mimic-lab.com}}
+\date{Fall Semester 2025}
+
+\begin{document}
+
+% Slide 1: Title
+\frame{\titlepage}
+
+% Slide 2: Today's Agenda
+\begin{frame}{Today's Agenda}
+\begin{itemize}
+    \item Motivate policy gradients and contrast them with value-based RL
+    \item Derive the policy gradient theorem and reinforce update
+    \item Study variance reduction with reward-to-go and baselines
+    \item Walk through PyTorch implementation patterns and debugging tips
+    \item Review experimental results from nine hands-on scripts
+\end{itemize}
+\end{frame}
+
+% Slide 3: Learning Objectives
+\begin{frame}{Learning Objectives}
+By the end of this lecture, you will be able to:
+\begin{enumerate}
+    \item Derive and interpret the policy gradient theorem
+    \item Implement REINFORCE with and without baselines
+    \item Compare moving-average and learned value function baselines
+    \item Analyze variance, entropy regularization, and normalization effects
+    \item Build a complete policy gradient agent in PyTorch
+\end{enumerate}
+
+\vspace{0.5cm}
+\textbf{Prerequisites:}
+\begin{itemize}
+    \item Understanding of MDPs and value functions (Lectures 4-5)
+    \item Experience with neural networks and PyTorch (Lecture 2)
+    \item Familiarity with Q-learning concepts (Lectures 5-7)
+\end{itemize}
+\end{frame}
+
+% Part 1: Introduction
+\section{Introduction to Policy Gradients}
+
+% Slide 4: Motivation
+\begin{frame}{Why Policy Gradients?}
+\textbf{Value-based methods (Q-learning, DQN):}
+\begin{itemize}
+    \item Learn $Q(s,a)$, derive policy: $\pi(s) = \arg\max_a Q(s,a)$
+    \item Discrete actions only (or discretized)
+    \item Deterministic policies
+\end{itemize}
+
+\vspace{0.5cm}
+\textbf{Policy-based methods:}
+\begin{itemize}
+    \item Directly parameterize $\pi_\theta(a|s)$
+    \item Natural for continuous actions
+    \item Stochastic policies
+    \item Can learn suboptimal stochastic policies
+\end{itemize}
+
+\vspace{0.5cm}
+\textbf{Key insight:} Optimize expected return directly!
+\end{frame}
+
+% Slide 5: Policy Parameterization
+\begin{frame}[fragile]{Policy Parameterization}
+\textbf{Stochastic policy:} $\pi_\theta(a|s)$ outputs probability distribution
+
+\vspace{0.5cm}
+\textbf{Discrete actions (Categorical):}
+\begin{lstlisting}
+logits = neural_network(state)  # [batch, n_actions]
+probs = softmax(logits)
+action = sample_categorical(probs)
+\end{lstlisting}
+
+\vspace{0.5cm}
+\textbf{Continuous actions (Gaussian):}
+\begin{lstlisting}
+mean = neural_network(state)    # [batch, action_dim]
+std = exp(log_std_parameter)    # learnable or fixed
+action = sample_normal(mean, std)
+\end{lstlisting}
+\end{frame}
+
+% Slide 6: Objective Function
+\begin{frame}{Policy Gradient Objective}
+\textbf{Goal:} Maximize expected return
+
+$$J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}[R(\tau)]$$
+
+where trajectory $\tau = (s_0, a_0, r_0, s_1, a_1, r_1, \ldots)$
+
+\vspace{0.5cm}
+\textbf{Different formulations:}
+\begin{itemize}
+    \item Start state value: $J(\theta) = V^{\pi_\theta}(s_0)$
+    \item Average value: $J(\theta) = \sum_s d^{\pi_\theta}(s) V^{\pi_\theta}(s)$
+    \item Average reward: $J(\theta) = \sum_{s,a} d^{\pi_\theta}(s) \pi_\theta(a|s) r(s,a)$
+\end{itemize}
+
+\vspace{0.5cm}
+\textbf{Challenge:} How to compute $\nabla_\theta J(\theta)$?
+\end{frame}
+
+% Slide 7: Gradient Estimation Problem
+\begin{frame}{The Gradient Problem}
+\textbf{Why can't we differentiate directly?}
+
+$$J(\theta) = \sum_\tau P(\tau|\theta) R(\tau)$$
+
+Taking gradient:
+$$\nabla_\theta J(\theta) = \sum_\tau \nabla_\theta P(\tau|\theta) R(\tau)$$
+
+\textbf{Problem:} $P(\tau|\theta)$ depends on environment dynamics!
+$$P(\tau|\theta) = p(s_0) \prod_{t=0}^{T-1} \pi_\theta(a_t|s_t) p(s_{t+1}|s_t,a_t)$$
+
+We don't know $p(s_{t+1}|s_t,a_t)$!
+\end{frame}
+
+% Part 2: Theory
+\section{Policy Gradient Theorem}
+
+% Slide 8: Log-Derivative Trick
+\begin{frame}{The Log-Derivative Trick}
+\textbf{Key insight:} Use the identity
+$$\nabla_\theta P(\tau|\theta) = P(\tau|\theta) \nabla_\theta \log P(\tau|\theta)$$
+
+\textbf{Proof:}
+$$\nabla_\theta \log P(\tau|\theta) = \frac{1}{P(\tau|\theta)} \nabla_\theta P(\tau|\theta)$$
+
+\textbf{Therefore:}
+$$\nabla_\theta J(\theta) = \sum_\tau P(\tau|\theta) \nabla_\theta \log P(\tau|\theta) R(\tau)$$
+$$= \mathbb{E}_{\tau \sim \pi_\theta}[\nabla_\theta \log P(\tau|\theta) R(\tau)]$$
+
+Now it's an expectation - we can sample!
+\end{frame}
+
+% Slide 9: Simplifying Log Probability
+\begin{frame}{Simplifying the Gradient}
+\textbf{Log probability of trajectory:}
+\begin{align}
+\log P(\tau|\theta) &= \log p(s_0) + \sum_{t=0}^{T-1} \log \pi_\theta(a_t|s_t) \\
+&\quad + \sum_{t=0}^{T-1} \log p(s_{t+1}|s_t,a_t)
+\end{align}
+
+\textbf{Taking gradient w.r.t. $\theta$:}
+$$\nabla_\theta \log P(\tau|\theta) = \sum_{t=0}^{T-1} \nabla_\theta \log \pi_\theta(a_t|s_t)$$
+
+Environment dynamics cancel out!
+\end{frame}
+
+% Slide 10: Policy Gradient Theorem
+\begin{frame}{Policy Gradient Theorem}
+\begin{theorem}[Policy Gradient]
+The gradient of expected return is:
+$$\nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}\left[\sum_{t=0}^{T-1} \nabla_\theta \log \pi_\theta(a_t|s_t) G_t\right]$$
+where $G_t = \sum_{k=t}^{T-1} \gamma^{k-t} r_k$ is the return from time $t$.
+\end{theorem}
+
+\vspace{0.5cm}
+\textbf{Intuition:}
+\begin{itemize}
+    \item Increase probability of actions that lead to high returns
+    \item Decrease probability of actions that lead to low returns
+    \item Weight by how good the return was
+\end{itemize}
+\end{frame}
+
+% Slide 11: Score Function Estimator
+\begin{frame}{Score Function Estimator}
+\textbf{Score function:} $\nabla_\theta \log \pi_\theta(a|s)$
+
+\vspace{0.3cm}
+\textbf{For discrete actions (softmax):}
+$$\nabla_\theta \log \pi_\theta(a|s) = \phi(s,a) - \mathbb{E}_{a' \sim \pi}[\phi(s,a')]$$
+
+\vspace{0.3cm}
+\textbf{For continuous actions (Gaussian):}
+$$\nabla_\theta \log \mathcal{N}(a|\mu_\theta(s), \sigma^2) = \frac{(a - \mu_\theta(s))}{\sigma^2} \nabla_\theta \mu_\theta(s)$$
+
+\vspace{0.3cm}
+\textbf{Properties:}
+\begin{itemize}
+    \item $\mathbb{E}_{a \sim \pi}[\nabla_\theta \log \pi_\theta(a|s)] = 0$
+    \item Points in direction of increasing action probability
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Experiment 2: Score-Function Visualisation}
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\centering
+\includegraphics[width=\linewidth]{figures/policy_gradient_visualization.png}
+\vspace{0.25em}
+{\scriptsize Exported by \texttt{exp02\_policy\_gradient\_math.py}.}
+\end{column}
+\begin{column}{0.5\textwidth}
+\textbf{Observations}
+\begin{itemize}
+    \item Analytical gradient at $\theta=0$ is \textbf{0.50}; one Monte Carlo draw produced \textbf{-0.0004}
+    \item Shows the score-function surface and gradient direction for a two-action policy
+    \item Single-sample estimates can be extremely noisy even in this toy example
+    \item Motivates baselines, reward-to-go, and batching strategies studied later
+\end{itemize}
+\end{column}
+\end{columns}
+\end{frame}
+
+% Part 3: REINFORCE Algorithm
+\section{REINFORCE Algorithm}
+
+% Slide 12: Basic REINFORCE
+\begin{frame}{REINFORCE: Monte Carlo Policy Gradient}
+\begin{algorithm}[H]
+\caption{REINFORCE (Basic Version)}
+\begin{algorithmic}[1]
+\STATE Initialize policy network $\pi_\theta$
+\FOR{episode = 1, 2, ...}
+    \STATE Collect trajectory $\tau = (s_0, a_0, r_0, ..., s_{T-1}, a_{T-1}, r_{T-1})$
+    \FOR{$t = 0$ to $T-1$}
+        \STATE $G_t \leftarrow \sum_{k=t}^{T-1} \gamma^{k-t} r_k$ \quad (compute return)
+    \ENDFOR
+    \STATE $\nabla J \leftarrow \sum_{t=0}^{T-1} \nabla_\theta \log \pi_\theta(a_t|s_t) \cdot G_t$
+    \STATE $\theta \leftarrow \theta + \alpha \nabla J$
+\ENDFOR
+\end{algorithmic}
+\end{algorithm}
+\end{frame}
+
+% Slide 13: PyTorch Implementation
+\begin{frame}[fragile]{REINFORCE in PyTorch}
+\begin{lstlisting}
+def reinforce_update(policy, optimizer, episode):
+    states, actions, rewards = episode
+    
+    # Compute returns
+    returns = []
+    G = 0
+    for r in reversed(rewards):
+        G = r + gamma * G
+        returns.insert(0, G)
+    
+    # Compute loss
+    loss = 0
+    for s, a, G in zip(states, actions, returns):
+        logits = policy(s)
+        log_prob = F.log_softmax(logits)[a]
+        loss += -log_prob * G
+    
+    # Update
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+\end{lstlisting}
+\end{frame}
+
+% Slide 14: High Variance Problem
+\begin{frame}{The Variance Problem}
+\textbf{REINFORCE gradient estimator:}
+$$\hat{g} = \sum_{t=0}^{T-1} \nabla_\theta \log \pi_\theta(a_t|s_t) G_t$$
+
+\textbf{Properties:}
+\begin{itemize}
+    \item \textcolor{green}{Unbiased}: $\mathbb{E}[\hat{g}] = \nabla_\theta J(\theta)$
+    \item \textcolor{red}{High variance}: Returns can vary wildly
+\end{itemize}
+
+\vspace{0.5cm}
+\textbf{Consequences:}
+\begin{itemize}
+    \item Slow learning
+    \item Unstable training
+    \item Poor sample efficiency
+\end{itemize}
+
+\vspace{0.5cm}
+\textbf{Solution:} Variance reduction techniques!
+\end{frame}
+
+% Part 4: Variance Reduction
+\section{Variance Reduction}
+
+% Slide 15: Reward-to-Go
+\begin{frame}{Variance Reduction: Reward-to-Go}
+\textbf{Original REINFORCE:}
+$$\nabla_\theta J = \mathbb{E}\left[\sum_{t=0}^{T-1} \nabla_\theta \log \pi_\theta(a_t|s_t) G_0\right]$$
+
+\textbf{Reward-to-go:}
+$$\nabla_\theta J = \mathbb{E}\left[\sum_{t=0}^{T-1} \nabla_\theta \log \pi_\theta(a_t|s_t) G_t\right]$$
+
+\textbf{Why does this work?}
+\begin{itemize}
+    \item Past rewards are independent of future actions
+    \item $\mathbb{E}[\nabla_\theta \log \pi_\theta(a_t|s_t) \cdot \text{past rewards}] = 0$
+    \item Reduces variance without bias
+\end{itemize}
+\end{frame}
+
+% Slide 16: Baselines
+\begin{frame}{Variance Reduction: Baselines}
+\textbf{Baseline subtraction:}
+$$\nabla_\theta J = \mathbb{E}\left[\sum_{t=0}^{T-1} \nabla_\theta \log \pi_\theta(a_t|s_t) (G_t - b(s_t))\right]$$
+
+\textbf{Why unbiased?}
+$$\mathbb{E}_{a \sim \pi}[\nabla_\theta \log \pi_\theta(a|s) \cdot b(s)] = b(s) \cdot \underbrace{\mathbb{E}_{a \sim \pi}[\nabla_\theta \log \pi_\theta(a|s)]}_{=0} = 0$$
+
+\textbf{Common baselines:}
+\begin{itemize}
+    \item Constant: $b = \mathbb{E}[G]$
+    \item State-dependent: $b(s) = V^\pi(s)$ (learned value function)
+    \item Exponential moving average of returns
+\end{itemize}
+\end{frame}
+
+% Slide 17: Advantage Functions
+\begin{frame}{Advantage Functions}
+\textbf{Advantage:} How much better is action $a$ than average?
+$$A^\pi(s,a) = Q^\pi(s,a) - V^\pi(s)$$
+
+\textbf{Policy gradient with advantages:}
+$$\nabla_\theta J = \mathbb{E}_{\tau \sim \pi_\theta}\left[\sum_{t=0}^{T-1} \nabla_\theta \log \pi_\theta(a_t|s_t) A_t\right]$$
+
+where $A_t = G_t - V(s_t)$
+
+\vspace{0.5cm}
+\textbf{Benefits:}
+\begin{itemize}
+    \item Much lower variance
+    \item Still unbiased
+    \item Bridge to Actor-Critic methods
+\end{itemize}
+\end{frame}
+
+% Slide 18: Types of Baselines
+\begin{frame}{Baseline Comparison}
+\begin{center}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Baseline Type} & \textbf{Complexity} & \textbf{Variance} & \textbf{Bias} \\
+\hline
+None & Low & High & None \\
+Constant & Low & Medium-High & None \\
+EMA & Low & Medium & None \\
+Value Function & High & Low & None* \\
+\hline
+\end{tabular}
+\end{center}
+
+\vspace{0.5cm}
+*If value function is accurate
+
+\vspace{0.5cm}
+\textbf{Implementation complexity vs performance trade-off}
+\begin{itemize}
+    \item Simple baselines: Easy to implement, moderate improvement
+    \item Value function: More complex, best performance
+    \item Path to Actor-Critic methods
+\end{itemize}
+\end{frame}
+
+% Slide 19: Entropy Regularization
+\begin{frame}[fragile]{Entropy Regularization}
+\textbf{Modified objective:}
+$$J(\theta) = \mathbb{E}_{\pi_\theta}[R] + \beta \mathcal{H}(\pi_\theta)$$
+
+where $\mathcal{H}(\pi_\theta) = -\mathbb{E}_{s,a}[\log \pi_\theta(a|s)]$
+
+\vspace{0.5cm}
+\textbf{Benefits:}
+\begin{itemize}
+    \item Encourages exploration
+    \item Prevents premature convergence
+    \item Smoother optimization landscape
+\end{itemize}
+
+\vspace{0.5cm}
+\textbf{Implementation:}
+\begin{lstlisting}
+entropy = -(probs * log_probs).sum(dim=-1)
+loss = -log_prob * advantage - beta * entropy
+\end{lstlisting}
+\end{frame}
+
+% Slide 20: Normalization Techniques
+\begin{frame}[fragile]{Normalization Techniques}
+\textbf{1. Advantage normalization:}
+\begin{lstlisting}
+advantages = (advantages - advantages.mean()) / 
+             (advantages.std() + 1e-8)
+\end{lstlisting}
+
+\textbf{2. Return normalization:}
+\begin{lstlisting}
+returns = (returns - returns.mean()) / 
+          (returns.std() + 1e-8)
+\end{lstlisting}
+
+\textbf{3. Observation normalization:}
+\begin{lstlisting}
+# Running mean/std
+obs_normalized = (obs - running_mean) / 
+                 sqrt(running_var + 1e-8)
+\end{lstlisting}
+
+\textbf{Benefits:} More stable gradients, faster convergence
+\end{frame}
+
+% Part 5: Implementation
+\section{Implementation Details}
+
+% Slide 21: Complete REINFORCE Implementation
+\begin{frame}{Complete REINFORCE Architecture}
+\textbf{System Components:}
+\begin{enumerate}
+    \item \textbf{Environment:} Provides states and rewards
+    \item \textbf{Policy Network} $\pi_\theta$: Maps states to action probabilities
+    \item \textbf{Value Network} $V_\phi$: Estimates state values (for baseline)
+    \item \textbf{Episode Buffer:} Stores trajectories $(s,a,r)$
+\end{enumerate}
+
+\vspace{0.5cm}
+\textbf{Data Flow:}
+\begin{itemize}
+    \item Environment → State → Policy → Action → Environment
+    \item Episode data → Buffer → Compute returns/advantages
+    \item Gradients update both Policy and Value networks
+\end{itemize}
+\end{frame}
+
+% Slide 22: Network Architecture
+\begin{frame}[fragile]{Neural Network Design}
+\begin{lstlisting}
+class PolicyNetwork(nn.Module):
+    def __init__(self, obs_dim, n_actions):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(obs_dim, 128),
+            nn.Tanh(),
+            nn.Linear(128, 128),
+            nn.Tanh(),
+            nn.Linear(128, n_actions)
+        )
+    
+    def forward(self, x):
+        return self.net(x)  # logits
+    
+    def get_action(self, state):
+        logits = self(state)
+        dist = Categorical(logits=logits)
+        action = dist.sample()
+        return action, dist.log_prob(action)
+\end{lstlisting}
+\end{frame}
+
+% Slide 23: Training Loop
+\begin{frame}[fragile]{Training Loop Structure}
+\begin{lstlisting}
+for episode in range(num_episodes):
+    # Collect episode
+    states, actions, rewards = [], [], []
+    obs = env.reset()
+    
+    while not done:
+        action, log_prob = policy.get_action(obs)
+        next_obs, reward, done, _ = env.step(action)
+        states.append(obs)
+        actions.append(action)
+        rewards.append(reward)
+        obs = next_obs
+    
+    # Compute returns and advantages
+    returns = compute_returns(rewards, gamma)
+    advantages = returns - value_net(states)
+    
+    # Update networks
+    update_policy(policy, states, actions, advantages)
+    update_value(value_net, states, returns)
+\end{lstlisting}
+\end{frame}
+
+% Slide 24: Hyperparameters
+\begin{frame}{Key Hyperparameters}
+\begin{center}
+\begin{tabular}{|l|c|l|}
+\hline
+\textbf{Parameter} & \textbf{Typical Value} & \textbf{Notes} \\
+\hline
+Learning rate (policy) & $10^{-3}$ to $10^{-2}$ & Higher than value \\
+Learning rate (value) & $10^{-3}$ to $10^{-4}$ & Lower for stability \\
+Discount factor $\gamma$ & 0.99 & Problem-dependent \\
+Entropy coefficient $\beta$ & 0.01 to 0.001 & Decay over time \\
+Gradient clipping & 0.5 to 1.0 & Prevents explosions \\
+Episodes per update & 1 to 16 & Trade-off \\
+Hidden dimensions & 64 to 256 & Task complexity \\
+\hline
+\end{tabular}
+\end{center}
+
+\vspace{0.5cm}
+\textbf{Tips:}
+\begin{itemize}
+    \item Start with high entropy, decay gradually
+    \item Use adaptive optimizers (Adam)
+    \item Monitor gradient norms
+\end{itemize}
+\end{frame}
+
+% Slide 25: Common Pitfalls
+\begin{frame}{Common Implementation Pitfalls}
+\textbf{1. Incorrect advantage calculation:}
+\begin{itemize}
+    \item Use detached values: \texttt{advantages = returns - values.detach()}
+    \item Don't backprop through advantages
+\end{itemize}
+
+\textbf{2. Wrong return computation:}
+\begin{itemize}
+    \item Ensure correct discounting
+    \item Handle episode termination properly
+\end{itemize}
+
+\textbf{3. Gradient issues:}
+\begin{itemize}
+    \item Always clear gradients: \texttt{optimizer.zero\_grad()}
+    \item Clip gradients to prevent explosions
+\end{itemize}
+
+\textbf{4. Numerical instability:}
+\begin{itemize}
+    \item Add small epsilon: \texttt{std + 1e-8}
+    \item Use log-sum-exp tricks
+\end{itemize}
+\end{frame}
+
+% Part 6: Advanced Topics
+\section{Advanced Topics}
+
+% Slide 26: Batch Training
+\begin{frame}[fragile]{Batch Training}
+\textbf{Single episode update:}
+\begin{itemize}
+    \item High variance gradients
+    \item Poor GPU utilization
+    \item Unstable learning
+\end{itemize}
+
+\vspace{0.5cm}
+\textbf{Batch episode update:}
+\begin{lstlisting}
+# Collect multiple episodes
+episodes = [collect_episode() for _ in range(batch_size)]
+
+# Concatenate all data
+all_states = concatenate([e.states for e in episodes])
+all_advantages = concatenate([e.advantages for e in episodes])
+
+# Single gradient update
+loss = compute_loss(all_states, all_advantages)
+\end{lstlisting}
+
+Benefits: Lower variance, better GPU usage, more stable
+\end{frame}
+
+% Slide 27: Learning Rate Scheduling
+\begin{frame}[fragile]{Learning Rate Scheduling}
+\textbf{Why schedule learning rates?}
+\begin{itemize}
+    \item Large LR initially for exploration
+    \item Small LR later for convergence
+    \item Adapt to training progress
+\end{itemize}
+
+\vspace{0.5cm}
+\textbf{Common schedules:}
+\begin{lstlisting}
+# Linear decay
+lr = lr_start * (1 - progress)
+
+# Exponential decay
+lr = lr_start * decay_rate ** epoch
+
+# Cosine annealing
+lr = lr_min + 0.5 * (lr_max - lr_min) * 
+     (1 + cos(pi * epoch / max_epochs))
+\end{lstlisting}
+\end{frame}
+
+% Slide 28: Gradient Clipping
+\begin{frame}[fragile]{Gradient Clipping Strategies}
+\textbf{Why clip gradients?}
+\begin{itemize}
+    \item Prevent gradient explosions
+    \item Stabilize training
+    \item Handle outlier trajectories
+\end{itemize}
+
+\vspace{0.5cm}
+\textbf{Clipping methods:}
+\begin{lstlisting}
+# Clip by value
+torch.nn.utils.clip_grad_value_(parameters, clip_value)
+
+# Clip by norm (preferred)
+torch.nn.utils.clip_grad_norm_(parameters, max_norm)
+
+# Adaptive clipping
+if grad_norm > threshold:
+    scale = threshold / grad_norm
+    gradients *= scale
+\end{lstlisting}
+\end{frame}
+
+% Slide 29: Continuous Actions
+\begin{frame}[fragile]{Extension to Continuous Actions}
+\textbf{Gaussian policy:}
+\begin{lstlisting}
+class ContinuousPolicy(nn.Module):
+    def __init__(self, obs_dim, action_dim):
+        super().__init__()
+        self.mean_net = nn.Sequential(
+            nn.Linear(obs_dim, 128),
+            nn.Tanh(),
+            nn.Linear(128, action_dim)
+        )
+        self.log_std = nn.Parameter(torch.zeros(action_dim))
+    
+    def forward(self, state):
+        mean = self.mean_net(state)
+        std = self.log_std.exp()
+        dist = Normal(mean, std)
+        action = dist.sample()
+        log_prob = dist.log_prob(action).sum(-1)
+        return action, log_prob
+\end{lstlisting}
+\end{frame}
+
+% Slide 30: Connection to Actor-Critic
+\begin{frame}{From REINFORCE to Actor-Critic}
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Method} & \textbf{Update} & \textbf{Characteristics} \\
+\hline
+REINFORCE & Monte Carlo & High variance, slow \\
+REINFORCE + baseline & Monte Carlo & Lower variance \\
+Actor-Critic & TD(0) & Online, lower variance \\
+A2C & Synchronous AC & Parallel environments \\
+A3C & Asynchronous AC & Distributed training \\
+\hline
+\end{tabular}
+\end{center}
+
+\vspace{0.5cm}
+\textbf{Key difference:} When to update
+\begin{itemize}
+    \item REINFORCE: End of episode (Monte Carlo)
+    \item Actor-Critic: Every step (TD learning)
+\end{itemize}
+
+\vspace{0.3cm}
+Next lecture: Actor-Critic methods!
+\end{frame}
+
+% Part 7: Experimental Results
+\section{Experimental Results}
+
+% Slide 31: Experiment 3 Results
+\begin{frame}{Experiment 3: Vanilla REINFORCE (CartPole-v1)}
+\textbf{Metrics (200 episodes)}
+\begin{itemize}
+    \item First 10 episodes mean return: \textbf{11.7}
+    \item Last 10 episodes mean return: \textbf{9.4}
+    \item Greedy evaluation (10 runs): \textbf{9.2 \textrm{±} 1.0}
+    \item Policy entropy collapses to \textbf{$\approx 0$} after \textasciitilde30 episodes
+    \item Loss oscillates between \textbf{-0.22} and \textbf{0.30} (high variance)
+\end{itemize}
+
+\vspace{0.4em}
+\textbf{Takeaways}
+\begin{itemize}
+    \item Full-return REINFORCE stalls near random performance on CartPole-v1.
+    \item Motivates variance-reduction tricks (reward-to-go, baselines) introduced next.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Experiment 3: Learning Curve}
+\centering
+\includegraphics[height=0.45\textheight]{figures/vanilla_reinforce_training.png}
+\vspace{0.2em}
+{\scriptsize Training curves logged by \texttt{exp03\_vanilla\_reinforce.py}.}
+\vspace{-1.5em}
+\end{frame}
+
+% New slide: Experiment 6 Results
+\begin{frame}{Experiment 6: Learned Value Baseline}
+\begin{columns}[T]
+\begin{column}{0.5\textwidth}
+\textbf{CartPole-v1 diagnostic}
+\begin{itemize}
+    \setlength{\itemsep}{0.2em}
+    \item Learned $V(s)$ baseline mean return (last 50): \textbf{9.46 \textrm{±} 0.81}
+    \item No-baseline control: \textbf{217.3 \textrm{±} 165.9} (solved by episode \textbf{60})
+    \item Value loss drops from \textbf{17.9} to \textbf{0.36} but policy underfits
+    \item Indicates strong coupling between baseline accuracy and policy LR
+\end{itemize}
+
+\vspace{0.4em}
+\textbf{Debug steps}
+\begin{itemize}
+    \setlength{\itemsep}{0.2em}
+    \item Increase policy learning rate once baseline stabilizes
+    \item Or bootstrap with TD targets (Actor-Critic, next lecture)
+    \item Monitor value loss + return gap to detect underfitting
+\end{itemize}
+\end{column}
+\begin{column}{0.48\textwidth}
+\centering
+\includegraphics[height=0.38\textheight]{figures/value_baseline_analysis.png}
+\vspace{0.15em}
+{\scriptsize Generated by \texttt{exp06\_baseline\_value.py}: value loss vs returns.}
+\end{column}
+\end{columns}
+\vspace{-1em}
+\end{frame}
+
+% Slide: Experiment 8 Results
+\begin{frame}{Experiment 8: Advanced REINFORCE Stack}
+\begin{columns}[T]
+\begin{column}{0.5\textwidth}
+\textbf{Configuration}
+\begin{itemize}
+    \item Batch updates: 8 episodes/update, cosine LR schedule
+    \item Baseline: value network + advantage normalization
+    \item Regularizers: entropy decay $0.01 \rightarrow 0.001$, grad clip 0.5
+\end{itemize}
+
+\vspace{0.4em}
+\textbf{Outcome}
+\begin{itemize}
+    \item Basic REINFORCE solved CartPole by update \textbf{30}
+    \item Advanced stack underperformed (final \textbf{105 ± 53}) — overly heavy regularization
+    \item Highlights need for careful scheduler tuning when batching updates
+\end{itemize}
+\end{column}
+\begin{column}{0.48\textwidth}
+\centering
+\includegraphics[width=\linewidth]{figures/advanced_reinforce_analysis.png}
+\vspace{0.25em}
+{\scriptsize Figure from \texttt{exp08\_advanced\_techniques.py}: baseline (blue) vs advanced (orange).}
+\end{column}
+\end{columns}
+\end{frame}
+
+% Slide: Experiment 9 Results
+\begin{frame}{Experiment 9: Integrated REINFORCE Smoke Test}
+\begin{columns}[T]
+\begin{column}{0.5\textwidth}
+{\scriptsize
+\begin{tabular}{|l|c|c|c|}
+\hline
+Baseline & Final Eval & Best Eval & Episodes \\
+\hline
+None & 500.0 & 500.0 & 400 \\
+EMA ($\alpha=0.05$) & 500.0 & 500.0 & 400 \\
+Value & 500.0 & 500.0 & 400 \\
+\hline
+\end{tabular}}
+
+\vspace{0.4em}
+\textbf{Automation checklist}
+\begin{itemize}
+    \item TensorBoard logs written to \texttt{runs/reinforce\_*}
+    \item Checkpoints in \texttt{checkpoints/}
+    \item Evaluation every 10 updates (10 episodes each)
+\end{itemize}
+
+\textbf{Use it to:} sanity-check new baselines, compare seeds, capture regressions
+\end{column}
+\begin{column}{0.48\textwidth}
+\centering
+\includegraphics[width=\linewidth]{figures/reinforce_integrated_results.png}
+\vspace{0.25em}
+{\scriptsize Output from \texttt{exp09\_integrated\_test.py}: training vs evaluation across baselines.}
+\end{column}
+\end{columns}
+\end{frame}
+
+% Slide 32: Experiment 4 Results
+\begin{frame}{Experiment 4: Reward-to-Go vs Full Returns}
+\begin{columns}[T]
+\begin{column}{0.5\textwidth}
+\textbf{Return statistics (last 50 episodes)}
+\begin{itemize}
+    \item Full returns: \textbf{63.9 \textrm{±} 43.2}
+    \item Reward-to-go: \textbf{25.6 \textrm{±} 4.6}
+    \item Gradient norm (avg): full \textbf{0.27}, reward-to-go \textbf{0.47}
+    \item Reward-to-go converged slower in this run (needs more tuning)
+\end{itemize}
+
+\vspace{0.4em}
+\textbf{Interpretation}
+\begin{itemize}
+    \item Reward-to-go removes past rewards from the estimator, reducing bias
+    \item With the current hyperparameters it also reduced signal magnitude
+    \item Try pairing reward-to-go with lower learning rate and a baseline
+\end{itemize}
+\end{column}
+\begin{column}{0.48\textwidth}
+\centering
+\includegraphics[width=\linewidth]{figures/reward_to_go_comparison.png}
+\vspace{0.25em}
+{\scriptsize Comparison generated by \texttt{exp04\_reward\_to\_go.py}: reward-to-go (blue) vs full returns (orange).}
+\end{column}
+\end{columns}
+\end{frame}
+
+% Slide 33: Experiment 7 Results
+\begin{frame}{Experiment 7: Entropy Regularization Sweep}
+\begin{columns}[T]
+\begin{column}{0.5\textwidth}
+\textbf{CartPole-v1 summary}
+\begin{itemize}
+    \item $\beta=0$: final return \textbf{9.3}, entropy \textbf{0.0000}
+    \item $\beta=0.001$: final return \textbf{32.8}, entropy \textbf{0.060}
+    \item $\beta=0.01$: final return \textbf{9.5}, entropy \textbf{0.0000}
+    \item $\beta=0.1$: final return \textbf{9.5}, entropy \textbf{0.0006}
+\end{itemize}
+
+\vspace{0.4em}
+\textbf{Lessons}
+\begin{itemize}
+    \item A small coefficient ($10^{-3}$) delayed collapse and yielded higher returns
+    \item Large coefficients hurt learning once policy should exploit
+    \item Schedule idea: start at $10^{-3}$ and decay toward $10^{-4}$ after stability
+\end{itemize}
+\end{column}
+\begin{column}{0.48\textwidth}
+\centering
+\includegraphics[width=\linewidth]{figures/entropy_regularization_analysis.png}
+\vspace{0.25em}
+{\scriptsize Results from \texttt{exp07\_entropy\_regularization.py}.}
+\end{column}
+\end{columns}
+\end{frame}
+
+% Slide 34: Experiment 5 Results
+\begin{frame}{Experiment 5: EMA Baseline Sweep}
+\begin{columns}[T]
+\begin{column}{0.5\textwidth}
+\begin{tabular}{|l|c|c|c|}
+\hline
+$\alpha$ & $\bar{R}_{50}$ & $\sigma_{50}$ & Episodes $\ge$195 \\
+\hline
+No baseline & 9.26 & 0.77 & 0 \\
+0.01 & \textbf{195.70} & 151.11 & 46 (Ep. 154) \\
+0.05 & 9.30 & 0.70 & 0 \\
+0.10 & 9.32 & 0.81 & 0 \\
+\hline
+\end{tabular}
+
+\vspace{0.4em}
+\textbf{Observations}
+\begin{itemize}
+    \item Small smoothing ($\alpha=0.01$) occasionally solves CartPole but with high variance
+    \item Aggressive smoothing ($\alpha \ge 0.05$) tracks returns closely → little benefit
+    \item Use EMA only if tuned; pair with reward normalization and lower learning rate
+\end{itemize}
+\end{column}
+\begin{column}{0.48\textwidth}
+\centering
+\includegraphics[width=\linewidth]{figures/ema_baseline_analysis.png}
+\vspace{0.25em}
+{\scriptsize Plot exported by \texttt{exp05\_baseline\_ema.py}: moving baseline vs returns.}
+\end{column}
+\end{columns}
+\end{frame}
+
+% Part 8: Practical Considerations
+\section{Practical Considerations}
+
+% Slide 35: When to Use Policy Gradients
+\begin{frame}{When to Use Policy Gradients?}
+\textbf{Good for:}
+\begin{itemize}
+    \item Continuous action spaces
+    \item Stochastic optimal policies
+    \item High-dimensional action spaces
+    \item Learning diverse behaviors
+\end{itemize}
+
+\vspace{0.5cm}
+\textbf{Not ideal for:}
+\begin{itemize}
+    \item Sample efficiency critical
+    \item Discrete, small action spaces (use DQN)
+    \item Need deterministic policy
+    \item Limited computational budget
+\end{itemize}
+
+\vspace{0.5cm}
+\textbf{Rule of thumb:} Start with DQN for discrete, PG for continuous
+\end{frame}
+
+% Slide 36: Debugging Tips
+\begin{frame}{Debugging Policy Gradients}
+\textbf{Common issues and solutions:}
+
+\begin{enumerate}
+    \item \textbf{No learning:}
+    \begin{itemize}
+        \item Check gradient flow
+        \item Verify advantage signs
+        \item Increase learning rate
+    \end{itemize}
+    
+    \item \textbf{Unstable training:}
+    \begin{itemize}
+        \item Reduce learning rate
+        \item Add gradient clipping
+        \item Normalize advantages
+    \end{itemize}
+    
+    \item \textbf{Policy collapse:}
+    \begin{itemize}
+        \item Add entropy regularization
+        \item Check for numerical issues
+        \item Reduce batch size
+    \end{itemize}
+\end{enumerate}
+\end{frame}
+
+% Slide 37: Monitoring Training
+\begin{frame}[fragile]{What to Monitor}
+\textbf{Essential metrics:}
+\begin{itemize}
+    \item Episode returns (mean, std)
+    \item Policy entropy
+    \item Gradient norms
+    \item Value function accuracy (if used)
+\end{itemize}
+
+\vspace{0.5cm}
+\textbf{TensorBoard logging:}
+\begin{lstlisting}
+writer.add_scalar('train/return', episode_return, step)
+writer.add_scalar('train/entropy', entropy, step)
+writer.add_scalar('train/grad_norm', grad_norm, step)
+writer.add_scalar('train/value_loss', value_loss, step)
+\end{lstlisting}
+
+\vspace{0.5cm}
+\textbf{Warning signs:}
+Entropy $\rightarrow$ 0, gradient explosion, value divergence
+\end{frame}
+
+% Slide 38: Computational Considerations
+\begin{frame}[fragile]{Computational Efficiency}
+\textbf{CPU vs GPU:}
+\begin{itemize}
+    \item Small networks: CPU often sufficient
+    \item Batch processing: GPU advantageous
+    \item Environment step: Always CPU
+\end{itemize}
+
+\vspace{0.5cm}
+\textbf{Optimization tips:}
+\begin{lstlisting}
+# Batch operations
+states = torch.stack(episode_states)
+values = value_net(states)  # Single forward pass
+
+# Vectorized environments
+envs = VectorEnv([make_env() for _ in range(n_envs)])
+\end{lstlisting}
+
+\vspace{0.5cm}
+\textbf{Memory management:}
+Clear gradients, detach when needed, limit buffer size
+\end{frame}
+
+% Part 9: Summary
+\section{Summary and Next Steps}
+
+% Slide 39: Key Takeaways
+\begin{frame}{Key Takeaways}
+\begin{enumerate}
+    \item \textbf{Policy Gradient Theorem:} Direct optimization of expected return
+    
+    \item \textbf{REINFORCE:} Simple but high-variance Monte Carlo method
+    
+    \item \textbf{Variance Reduction:} Critical for practical performance
+    \begin{itemize}
+        \item Reward-to-go
+        \item Baselines (especially value functions)
+        \item Normalization
+    \end{itemize}
+    
+    \item \textbf{Implementation:} Many details matter
+    \begin{itemize}
+        \item Proper advantage computation
+        \item Gradient clipping
+        \item Entropy regularization
+    \end{itemize}
+    
+    \item \textbf{Trade-offs:} Simplicity vs efficiency vs stability
+\end{enumerate}
+\end{frame}
+
+% Slide 40: Comparison Table
+\begin{frame}{Algorithm Comparison}
+\begin{center}
+\begin{tabular}{|l|c|c|c|c|}
+\hline
+\textbf{Aspect} & \textbf{Q-Learning} & \textbf{DQN} & \textbf{REINFORCE} & \textbf{A2C} \\
+\hline
+Action space & Discrete & Discrete & Any & Any \\
+Update & TD & TD & MC & TD \\
+Sample efficiency & High & High & Low & Medium \\
+Stability & High & Medium & Low & Medium \\
+Continuous & No & No & Yes & Yes \\
+Implementation & Simple & Complex & Simple & Medium \\
+\hline
+\end{tabular}
+\end{center}
+
+\vspace{0.5cm}
+\textbf{Next lecture:} Actor-Critic methods (A2C)
+\begin{itemize}
+    \item Combines policy gradient with value learning
+    \item Online updates (no waiting for episode end)
+    \item Better sample efficiency
+\end{itemize}
+\end{frame}
+
+
+% Slide 43: Next Week Preview
+\begin{frame}{Next Week: Actor-Critic Methods}
+\textbf{What we'll cover:}
+\begin{itemize}
+    \item TD learning for value estimation
+    \item Advantage Actor-Critic (A2C)
+    \item Parallel environment collection
+    \item Generalized Advantage Estimation (GAE)
+\end{itemize}
+
+\vspace{0.5cm}
+\textbf{Key improvements over REINFORCE:}
+\begin{itemize}
+    \item Online learning (no episode boundary needed)
+    \item Lower variance through bootstrapping
+    \item Better sample efficiency
+    \item Foundation for modern algorithms (PPO, SAC)
+\end{itemize}
+
+\vspace{0.5cm}
+\textbf{Preparation:} Review TD learning and value functions
+\end{frame}
+
+
+
+
+\end{document}
