@@ -4,7 +4,7 @@ _Sogang University MIMIC Lab_
 This repository hosts the lecture slides and hands-on experiments for the Fall 2025 offering of METT519 Reinforcement Learning. The focus is on reproducible PyTorch implementations that track the lecture flow.
 
 ## What's Here
-- Six lecture modules (`lecture01`–`lecture06`) with synchronized slides and runnable experiments
+- Eleven lecture modules (`lecture01`–`lecture11`) with synchronized slides and runnable experiments
 - Integrated tests (`exp09_integrated_test.py`) that validate each lecture's code bundle
 - Repository workflow guidelines in `lectures/AGENTS.md`
 - Python dependency lock-in via `requirements.txt`
@@ -18,7 +18,12 @@ This repository hosts the lecture slides and hands-on experiments for the Fall 2
 | 4 | Mathematical Foundations | Slides, experiments | MDP formalism, Bellman equations, policy/value iteration |
 | 5 | Value-Based Learning I | Slides, experiments | Tabular Q-learning, exploration schedules, integrated test bench |
 | 6 | Deep Q-Networks | Slides, experiments | Replay buffers, target networks, Double DQN, AMP toggles |
-| 7–13 | In Development | — | Content will be uploaded after slide/code alignment |
+| 7 | DQN Project (CartPole Case Study) | Slides, experiments | Advanced DQN variants, debugging, integrated DQN project |
+| 8 | Policy Gradient Methods — REINFORCE | Slides, experiments | Baselines, reward-to-go, entropy regularization |
+| 9 | Actor-Critic Methods | Slides, experiments | Advantage estimation (GAE), A2C/A3C, entropy tuning |
+| 10 | Proximal Policy Optimization (PPO) | Slides, experiments | Clipped objective, GAE, tuning and diagnostics |
+| 11 | Modern Directions & Capstone: RLHF, DPO, MCTS, AlphaZero | Slides, experiments | RLHF pipeline, DPO, PUCT/MCTS, AlphaZero self-play |
+
 
 ## Directory Layout
 ```
@@ -30,7 +35,12 @@ This repository hosts the lecture slides and hands-on experiments for the Fall 2
 │   ├── lecture04/  # MDPs and dynamic programming
 │   ├── lecture05/  # Tabular Q-learning
 │   ├── lecture06/  # Deep Q-Networks
-│   └── ...
+│   ├── lecture07/  # DQN project (CartPole)
+│   ├── lecture08/  # REINFORCE
+│   ├── lecture09/  # Actor-Critic (A2C/A3C, GAE)
+│   ├── lecture10/  # PPO
+│   └── lecture11/  # Modern RL: RLHF, DPO, MCTS, AlphaZero
+├── LICENSE
 ├── requirements.txt
 └── README.md
 ```
@@ -42,9 +52,9 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-- Verify the toolchain with `python lectures/lecture01/experiments/exp09_integrated_test.py`.
-- For Lecture 6 determinism, export `RL_DETERMINISTIC=1` before running experiments to disable `torch.compile` and AMP.
-- Slides are built with `pdflatex lecture0X/slides/lectureX.tex`; rebuild after editing.
+- Verify each lecture with `python lectures/lectureXX/experiments/exp09_integrated_test.py` (replace `XX`).
+- For DQN stability (Lectures 6–7), export `RL_DETERMINISTIC=1` before running experiments to disable `torch.compile` and AMP.
+- Slides are built with `pdflatex lectures/lectureXX/slides/lectureXX.tex`; rebuild after editing.
 
 ## Working Notes
 - GPU acceleration is optional; CPU-only execution is supported throughout Lecture 6 with smaller batch sizes.
@@ -52,4 +62,4 @@ pip install -r requirements.txt
 ## License
 Released under the MIT License. See `LICENSE` for details.
 
-_Last updated: 2025-09-23_
+_Last updated: 2025-11-16_
