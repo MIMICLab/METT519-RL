@@ -1,0 +1,27 @@
+% mimic.sty - Custom LaTeX style for MIMIC Lab presentations
+% Provides better line breaking and formatting for overfull boxes
+
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{mimic}[2025/01/07 MIMIC Lab custom style]
+
+% Better line breaking
+\sloppy
+\tolerance=1000
+\hbadness=10000
+\emergencystretch=10pt
+
+% Fix overfull hbox warnings
+\hfuzz=5pt
+\vfuzz=5pt
+
+% Better handling of URLs and long text
+\RequirePackage{url}
+\RequirePackage{xspace}
+
+% Custom commands for better formatting
+\newcommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+
+% Prevent overfull boxes in beamer
+\def\breakhere{\discretionary{\hbox{-}}{\hbox{}}{\hbox{}}}
+
+\endinput
