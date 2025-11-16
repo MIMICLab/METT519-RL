@@ -54,7 +54,7 @@
 \begin{itemize}
     \item Why move beyond vanilla policy gradients
     \item Value baselines, advantage estimation, and GAE
-    \item Actor-Critic architectures and vectorised A2C
+    \item Actor-Critic architectures, A2C and A3C
     \item Entropy regularisation and tuning workflows
     \item Hands-on experiments and integrated A2C run
 \end{itemize}
@@ -69,6 +69,7 @@ By the end of this lecture, you will:
     \item Explain why Actor-Critic reduces variance vs vanilla policy gradients
     \item Derive n-step and GAE advantage estimators
     \item Analyze bias-variance trade-offs in bootstrapping
+    \item Explain the difference between synchronous A2C and asynchronous A3C
 \end{itemize}
 
 \textbf{Practical Skills:}
@@ -104,43 +105,54 @@ $$\nabla_\theta J(\theta) = \mathbb{E}[\nabla_\theta \log \pi_\theta(a|s) \cdot 
 $\Rightarrow$ \textbf{Actor-Critic Methods}
 \end{frame}
 
-% Slide 5: Actor-Critic Concept
+% Slide 5: Actor-Critic Concept (Text Only)
 \begin{frame}{Actor-Critic: Best of Both Worlds}
-\begin{columns}
-\begin{column}{0.5\textwidth}
-\textbf{Actor (Policy):}
 \begin{itemize}
-    \item Learns policy $\pi_\theta(a|s)$
-    \item Selects actions
-    \item Updated via policy gradients
-\end{itemize}
+    \item \textbf{Actor (Policy):}
+    \begin{itemize}
+        \item Learns policy $\pi_\theta(a|s)$
+        \item Selects actions in each state
+        \item Updated via policy gradients
+    \end{itemize}
 
-\textbf{Critic (Value Function):}
-\begin{itemize}
-    \item Learns value $V_\phi(s)$
-    \item Evaluates actions
-    \item Provides baseline for actor
+    \item \textbf{Critic (Value Function):}
+    \begin{itemize}
+        \item Learns value function $V_\phi(s)$
+        \item Evaluates how good a state (or action) is
+        \item Provides a learned baseline for the actor
+    \end{itemize}
+
+    \item \textbf{Key Idea:}
+    \begin{itemize}
+        \item Actor focuses on \emph{choosing actions}
+        \item Critic focuses on \emph{evaluating} those actions via $V(s)$
+        \item Combining them reduces variance while keeping policy gradient flexibility
+    \end{itemize}
 \end{itemize}
-\end{column}
-\begin{column}{0.5\textwidth}
+\end{frame}
+
+% Slide 6: Actor-Critic Information Flow (Diagram Only)
+\begin{frame}{Actor-Critic Information Flow}
 \begin{center}
 \begin{tikzpicture}[>=Latex]
+    % Nodes
     \node[draw, rounded corners, fill=blue!15, minimum width=1.3cm, minimum height=0.9cm] (state) {$s_t$};
     \node[draw, rounded corners, fill=green!20, right=2.4cm of state, minimum width=2.5cm] (actor) {Actor $\pi_\theta$};
     \node[draw, rounded corners, fill=orange!25, below=1.6cm of actor, minimum width=2.5cm] (critic) {Critic $V_\phi$};
     \node[draw, rounded corners, fill=gray!15, right=3.2cm of actor, minimum width=2.5cm] (env) {Environment};
 
+    % Arrows
     \draw[->] (state) -- node[above] {state} (actor);
     \draw[->] (actor) -- node[above] {$a_t$} (env);
     \draw[->] (env) |- node[pos=0.25, right] {$r_t$} (critic);
-    \draw[->] (critic) -| node[pos=0.85, below] {baseline} (actor);
+    \draw[->] (critic) -| node[pos=0.85, below] {value / baseline} (actor);
     \draw[->] (env) -- ++(0,1.4) -| node[above left] {$s_{t+1}$} (state);
 \end{tikzpicture}
-\end{center}
-\end{column}
-\end{columns}
 
-\textbf{Key Insight:} Critic provides learned baseline, reducing variance while maintaining policy gradient benefits.
+\vspace{0.6em}
+
+{\small Critic learns $V_\phi(s)$ as a baseline, which is used to form advantages for updating the actor.}
+\end{center}
 \end{frame}
 
 % Slide 6: Mathematical Foundation
@@ -276,6 +288,58 @@ def compute_gae(rewards, values, terminated, gamma=0.99, lam=0.95):
 \end{itemize}
 
 \textbf{vs A3C:} A2C uses synchronous updates vs A3C's asynchronous updates
+\end{frame}
+% --- New Frame: A3C ---
+\begin{frame}{Asynchronous Advantage Actor-Critic (A3C)}
+\textbf{Key Idea:} Multiple workers run in parallel and update a shared set of parameters asynchronously.
+
+\textbf{Architecture:}
+\begin{itemize}
+    \item One global network (shared actor-critic parameters)
+    \item Many worker agents, each with:
+    \begin{itemize}
+        \item Its own environment instance
+        \item A local copy of the network
+        \item Its own rollout horizon and gradients
+    \end{itemize}
+    \item Workers periodically push gradients to the global network and pull updated parameters
+\end{itemize}
+
+\textbf{Training Loop (per worker):}
+\begin{enumerate}
+    \item Sync local network parameters from the global network
+    \item Run for $t_{\max}$ steps (or until termination) in its own environment
+    \item Compute advantages and returns from the local trajectory
+    \item Compute policy, value, and entropy losses
+    \item Apply gradients to update the global parameters (asynchronously)
+\end{enumerate}
+
+\textbf{Original Motivation:} Fully CPU-based parallelism with Hogwild-style updates, no GPU required.
+\end{frame}
+% --- New Frame: A2C vs A3C ---
+\begin{frame}{A2C vs A3C: Parallelism Patterns}
+\textbf{Synchronous A2C:}
+\begin{itemize}
+    \item Collect rollouts from all $N$ environments in lockstep for $T$ steps
+    \item Aggregate a single large batch and perform one update
+    \item Easier to implement and debug
+    \item Naturally suited to GPU training
+\end{itemize}
+
+\textbf{Asynchronous A3C:}
+\begin{itemize}
+    \item Each worker runs and updates independently
+    \item No strict synchronization across workers
+    \item Reduces correlation between trajectories
+    \item Exploits many CPU cores without heavy coordination
+\end{itemize}
+
+\textbf{Modern Practice:}
+\begin{itemize}
+    \item A2C (and PPO) are more common in GPU-based implementations
+    \item A3C is historically important and still useful on CPU clusters
+    \item Conceptually, A2C is a synchronized, batched version of A3C
+\end{itemize}
 \end{frame}
 
 % Slide 12: A2C Loss Functions
@@ -428,7 +492,7 @@ obs, rewards, terminated, truncated, infos = envs.step(actions)
 % Slide 18: Bias-Variance Trade-off Analysis
 \begin{frame}{Bias-Variance Trade-off in Advantage Estimation}
 \begin{center}
-\begin{tikzpicture}[scale=1.0, >=Latex]
+\begin{tikzpicture}[scale=0.8, >=Latex]
     \draw[->] (0,0) -- (5.5,0) node[right] {$\lambda$};
     \draw[->] (0,0) -- (0,3.2) node[above] {Error};
     \draw (0,0) node[below left] {0};
@@ -639,12 +703,11 @@ obs, reward, terminated, truncated, _ = env.step(actions)
 \end{itemize}
 
 \begin{center}
-\includegraphics[width=0.8\linewidth]{figures/value_estimate_random_policy.png}
-\vspace{0.25em}
+\includegraphics[width=0.5\linewidth]{figures/value_estimate_random_policy.png}
+\newline
 {\scriptsize Monte Carlo $V(s_t)$ profile for a random CartPole policy.}
 \end{center}
 
-\textbf{Takeaway:} returns decay quickly even for short horizons -- a prime motivation for online actor-critic updates instead of full-episode Monte Carlo targets.
 \end{frame}
 % Slide 26: Experiment 3 - Policy Gradients
 \begin{frame}[fragile]{Experiment 3: Policy Gradient Review}
@@ -720,10 +783,9 @@ print(returns.mean(), advantages.mean())
 \end{itemize}
 
 \begin{center}
-\includegraphics[width=0.75\linewidth]{figures/gae_lambda_profiles.png}
+\includegraphics[width=0.6\linewidth]{figures/gae_lambda_profiles.png}
 \end{center}
 
-\textbf{Observation:} higher $\lambda$ amplifies signal but also variance -- choose based on rollout horizon.
 \end{frame}
 % Slide 30: Experiment 7 - Vectorized A2C
 \begin{frame}{Experiment 7: Vectorized A2C}
@@ -737,10 +799,8 @@ print(returns.mean(), advantages.mean())
 \end{itemize}
 
 \begin{center}
-\includegraphics[width=0.75\linewidth]{figures/a2c_vectorized_learning_curve.png}
+\includegraphics[width=0.6\linewidth]{figures/a2c_vectorized_learning_curve.png}
 \end{center}
-
-\textbf{Next steps:} increase updates or tune entropy coefficient (see Experiment 8) to reach solving performance.
 \end{frame}
 % Slide 32: Experiment 8 - Entropy Analysis
 \begin{frame}{Experiment 8: Entropy Regularization Analysis}
@@ -754,10 +814,9 @@ print(returns.mean(), advantages.mean())
 \end{itemize}
 
 \begin{center}
-\includegraphics[width=0.75\linewidth]{figures/a2c_entropy_sweep.png}
+\includegraphics[width=0.6\linewidth]{figures/a2c_entropy_sweep.png}
 \end{center}
 
-\textbf{Guideline:} start with $10^{-3}$ and anneal as returns plateau.
 \end{frame}
 % Slide 33: Experiment 9 - Complete A2C
 \begin{frame}{Experiment 9: Complete A2C Integration}
@@ -771,10 +830,9 @@ print(returns.mean(), advantages.mean())
 \end{itemize}
 
 \begin{center}
-\includegraphics[width=0.8\linewidth]{figures/a2c_integrated_learning.png}
+\includegraphics[width=0.6\linewidth]{figures/a2c_integrated_learning.png}
 \end{center}
 
-\textbf{Usage:} regression test for future improvements (e.g., entropy annealing, longer horizons) before touching lecture slides.
 \end{frame}
 % Slide 34: Key Implementation Details
 \begin{frame}[fragile]{Key Implementation Details}
@@ -915,26 +973,10 @@ Rollout Steps & 32 to 512 & 128 \\
 \end{itemize}
 \end{frame}
 
-% --- MICRO-BREAK ---
-\begin{frame}{Micro-Break}
-\begin{center}
-\Huge Take a short break!
-
-\vspace{1cm}
-\Large Coming up: Live Coding Session
-
-\vspace{0.5cm}
-\normalsize
-\textbullet\ Run complete experiments\\
-\textbullet\ Debug common issues\\
-\textbullet\ Performance analysis\\
-\textbullet\ Extensions and improvements
-\end{center}
-\end{frame}
 
 % Slide 39: Live Coding Session
-\begin{frame}{Live Coding Session Plan}
-\textbf{Demonstration Sequence:}
+\begin{frame}{Experimental Results}
+\textbf{Steps}
 \begin{enumerate}
     \item \textbf{Quick Setup Check} (exp01): Environment verification
     \item \textbf{Building Blocks} (exp02-04): Value functions, policies, AC
@@ -1191,30 +1233,6 @@ def profile_training_step():
 \end{itemize}
 \end{frame}
 
-% Slide 48: Lab Exercise Preview
-\begin{frame}{Lab Exercise Preview}
-\textbf{Take-Home Exercises (6 exercises, 100 points):}
-
-\begin{enumerate}
-    \item \textbf{GAE Analysis} (15 pts): Implement GAE with different $\lambda$ values
-    \item \textbf{Architecture Comparison} (20 pts): Shared vs separate AC networks  
-    \item \textbf{Entropy Scheduling} (15 pts): Implement and compare schedules
-    \item \textbf{Advantage Normalization} (15 pts): Study normalization effects
-    \item \textbf{Hyperparameter Sweep} (25 pts): Grid search on key parameters
-    \item \textbf{Extension Implementation} (10 pts): Choose one advanced feature
-\end{enumerate}
-
-\textbf{Bonus Exercise} (10 pts): Implement A2C for continuous control
-
-\textbf{Deliverables:}
-\begin{itemize}
-    \item Working code with proper documentation
-    \item Experimental results and visualizations
-    \item Written analysis of findings
-\end{itemize}
-
-\textbf{Due:} Before next lecture (Week 10)
-\end{frame}
 
 % Slide 49: Summary - Theory
 \begin{frame}{Summary: Theory Highlights}
@@ -1254,11 +1272,6 @@ L &= L_{\text{policy}} + c_v L_{\text{value}} - \beta \mathcal{H}(\pi)
     \item Performance profiling and optimization
 \end{itemize}
 
-\textbf{Achievement Unlocked:} 
-\begin{center}
-\Large CartPole-v1 Solved! \\
-\normalsize (Average reward $\geq 475$)
-\end{center}
 \end{frame}
 
 % Slide 51: Next Week Preview
@@ -1286,86 +1299,6 @@ L &= L_{\text{policy}} + c_v L_{\text{value}} - \beta \mathcal{H}(\pi)
     \item Complete lab exercises
     \item Read Schulman et al. (2017) - PPO paper
 \end{itemize}
-\end{frame}
-
-% Slide 52: Additional Resources
-\begin{frame}{Additional Resources}
-\textbf{Essential Papers:}
-\begin{itemize}
-    \item Mnih et al. (2016): "Asynchronous Methods for Deep Reinforcement Learning" (A3C)
-    \item Schulman et al. (2016): "High-Dimensional Continuous Control Using GAE"
-    \item Sutton \& Barto (2018): Chapter 13 - Policy Gradient Methods
-\end{itemize}
-
-\textbf{Implementation References:}
-\begin{itemize}
-    \item Stable Baselines3: Professional RL library
-    \item OpenAI Baselines: Original implementations
-    \item CleanRL: Single-file implementations for learning
-\end{itemize}
-
-\textbf{Online Resources:}
-\begin{itemize}
-    \item Spinning Up in Deep RL (OpenAI)
-    \item Deep Reinforcement Learning Course (UC Berkeley CS285)
-    \item PyTorch RL tutorials and examples
-\end{itemize}
-
-\textbf{Debugging Tools:}
-\begin{itemize}
-    \item TensorBoard for visualization
-    \item Weights \& Biases for experiment tracking
-    \item OpenAI Gym for standardized environments
-\end{itemize}
-\end{frame}
-
-% Slide 53: Q&A Session
-\begin{frame}{Questions \& Discussion}
-\begin{center}
-\Huge Questions \& Discussion
-
-\vspace{1cm}
-\Large Topics for Discussion:
-\end{center}
-
-\begin{itemize}
-    \item Actor-Critic theory and implementation
-    \item GAE and advantage estimation methods
-    \item Hyperparameter tuning strategies
-    \item Performance optimization techniques
-    \item Extensions and variations
-    \item Real-world applications
-    \item Common debugging scenarios
-    \item Next steps in learning RL
-\end{itemize}
-
-\begin{center}
-\vspace{0.5cm}
-\normalsize
-\textbf{Office Hours:} Available after class for deeper technical discussions
-\end{center}
-\end{frame}
-
-% Slide 54: Thank You
-\begin{frame}
-\begin{center}
-\Huge Thank You!
-
-\vspace{1cm}
-\Large Lecture 9: Actor-Critic Methods \\
-\large Complete
-
-\vspace{1cm}
-\normalsize
-\textbf{Next Lecture:} Proximal Policy Optimization (PPO)\\
-\textbf{Lab Due:} Before Week 10\\
-\textbf{Contact:} \url{taehoon.kim@sogang.ac.kr}
-
-\vspace{0.5cm}
-\small
-Sogang University MIMIC Lab \\
-\url{https://mimic-lab.com}
-\end{center}
 \end{frame}
 
 \end{document}
